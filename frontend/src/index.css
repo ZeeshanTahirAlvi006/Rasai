@@ -1,0 +1,317 @@
+@import "tailwindcss";
+@plugin "daisyui"{
+  themes: 'black'
+};
+
+@theme {
+  --font-serif: "Instrument Serif", "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", "Gulzar", "Noto Sans Arabic", "Urdu Typesetting", "Segoe UI Historic", Tahoma, sans-serif;
+  --color-base: #0b0b0b;
+  --color-warm-white: #f4efe8;
+  --color-sand: #c9a47a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide default browser scrollbars on landing page */
+.no-scrollbar,
+html.no-scrollbar,
+body.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.no-scrollbar::-webkit-scrollbar,
+html.no-scrollbar::-webkit-scrollbar,
+body.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* 6px Thin Custom Scrollbar (for rest of site) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0b0b;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+/* Accessibility Focus Visible */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 4px;
+}
+
+/* Page-load Intro Animations */
+@keyframes heroFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-header {
+  animation: heroFadeInUp 900ms cubic-bezier(0.2, 0.7, 0.2, 1) 0ms backwards;
+}
+
+.animate-fade-in-headline {
+  animation: heroFadeInUp 900ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms backwards;
+}
+
+.animate-fade-in-bottom {
+  animation: heroFadeInUp 900ms cubic-bezier(0.2, 0.7, 0.2, 1) 240ms backwards;
+}
+
+/* ==========================================================================
+   Scroll Down Indicator - From Uiverse.io by ArturCodeCraft
+   ========================================================================== */
+@keyframes scroll-down {
+  0%, 100% {
+    transform: translateY(0rem);
+    opacity: 1;
+  }
+  35% {
+    transform: translateY(0.6rem);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(-0.6rem);
+    opacity: 0;
+  }
+}
+
+.animate-scroll-down {
+  animation: scroll-down 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.main__action:hover .main__scroll-box {
+  animation: scroll-down 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-fade-in-header,
+  .animate-fade-in-headline,
+  .animate-fade-in-bottom {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   Hamburger Button - From Uiverse.io by JulanDeAlb
+   ========================================================================== */
+.hamburger {
+  cursor: pointer;
+}
+
+.hamburger input {
+  display: none;
+}
+
+.hamburger svg {
+  transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hamburger .line {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  transition: stroke-dasharray 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hamburger .line-top-bottom {
+  stroke-dasharray: 12 63;
+}
+
+.hamburger input:checked + svg,
+.hamburger.is-active svg {
+  transform: rotate(-45deg);
+}
+
+.hamburger input:checked + svg .line-top-bottom,
+.hamburger.is-active svg .line-top-bottom {
+  stroke-dasharray: 20 300;
+  stroke-dashoffset: -32.42px;
+}
+
+/* ==========================================================================
+   Uiverse.io Outline Navbar (by SelfMadeSystem) - Dark & Light Modes
+   ========================================================================== */
+.uiverse-nav,
+.nav {
+  position: relative;
+  width: 400px;
+  height: 60px;
+}
+
+.uiverse-nav-container,
+.nav .container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.5em;
+  border-radius: 0.5rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Dark Mode - Container */
+.dark .uiverse-nav-container,
+[data-theme="black"] .uiverse-nav-container,
+.uiverse-nav-dark .uiverse-nav-container {
+  background: rgba(20, 20, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Light Mode - Container */
+.light .uiverse-nav-container,
+[data-theme="light"] .uiverse-nav-container,
+.uiverse-nav-light .uiverse-nav-container {
+  background: rgba(244, 239, 232, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.uiverse-nav-btn,
+.nav .btn {
+  padding: 0.5em 1.4em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  user-select: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* Dark Mode - Button */
+.dark .uiverse-nav-btn,
+[data-theme="black"] .uiverse-nav-btn,
+.uiverse-nav-dark .uiverse-nav-btn,
+.dark .nav .btn,
+.uiverse-nav-dark .btn {
+  color: #f4efe8;
+}
+.dark .uiverse-nav-btn:hover,
+[data-theme="black"] .uiverse-nav-btn:hover,
+.uiverse-nav-dark .uiverse-nav-btn:hover,
+.dark .nav .btn:hover,
+.uiverse-nav-dark .btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* Light Mode - Button */
+.light .uiverse-nav-btn,
+[data-theme="light"] .uiverse-nav-btn,
+.uiverse-nav-light .uiverse-nav-btn,
+.light .nav .btn,
+.uiverse-nav-light .btn {
+  color: #0b0b0b;
+}
+.light .uiverse-nav-btn:hover,
+[data-theme="light"] .uiverse-nav-btn:hover,
+.uiverse-nav-light .uiverse-nav-btn:hover,
+.light .nav .btn:hover,
+.uiverse-nav-light .btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  color: #0b0b0b;
+}
+
+.uiverse-nav-outline,
+.nav .outline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  width: 400px;
+  height: 60px;
+}
+
+.uiverse-nav-rect,
+.nav .rect {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 100 0;
+  transition: stroke-dashoffset 0.5s ease, stroke-dasharray 0.5s ease, stroke 0.3s ease;
+}
+
+/* Dark Mode - Rect (White Glow) */
+.dark .uiverse-nav-rect,
+[data-theme="black"] .uiverse-nav-rect,
+.uiverse-nav-dark .uiverse-nav-rect,
+.dark .nav .rect,
+.uiverse-nav-dark .rect {
+  stroke: #ffffff;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+}
+
+/* Light Mode - Rect (White Glow) */
+.light .uiverse-nav-rect,
+[data-theme="light"] .uiverse-nav-rect,
+.uiverse-nav-light .uiverse-nav-rect,
+.light .nav .rect,
+.uiverse-nav-light .rect {
+  stroke: #ffffff;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45));
+}
+
+/* Hover on Button 1 (Home) */
+.uiverse-nav-btn:nth-child(1):hover ~ svg .rect,
+.nav .btn:nth-child(1):hover ~ svg .rect {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 0 2 8 73.3 8 10.7;
+}
+
+/* Hover on Button 2 (Contact) */
+.uiverse-nav-btn:nth-child(2):hover ~ svg .rect,
+.nav .btn:nth-child(2):hover ~ svg .rect {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 0 12.6 9.5 49.3 9.5 31.6;
+}
+
+/* Hover on Button 3 (About) */
+.uiverse-nav-btn:nth-child(3):hover ~ svg .rect,
+.nav .btn:nth-child(3):hover ~ svg .rect {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 0 24.5 8.5 27.5 8.5 55.5;
+}
+
+/* Hover on Button 4 (FAQ) */
+.uiverse-nav-btn:nth-child(4):hover ~ svg .rect,
+.nav .btn:nth-child(4):hover ~ svg .rect {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 0 34.7 6.9 10.2 6.9 76;
+}

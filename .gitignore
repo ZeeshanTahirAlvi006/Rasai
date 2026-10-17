@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.log
+.rules
+ndr_aidlc_planning_specification.md
+ndr_aidlc_product_requirements_specification.md
