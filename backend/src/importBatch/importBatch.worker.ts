@@ -356,7 +356,7 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
           sim.ndrAttempt += 1;
         }
 
-        const hasEffect = (eff: string) => decision.effects.includes(eff as any);
+        const hasEffect = (eff: string) => (decision.effects as any[]).includes(eff);
 
         if (hasEffect('MARK_NEEDS_MANIFEST')) sim.needsManifest = true;
         if (hasEffect('CLEAR_NEEDS_MANIFEST')) sim.needsManifest = false;

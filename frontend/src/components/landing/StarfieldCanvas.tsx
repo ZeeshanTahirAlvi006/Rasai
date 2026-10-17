@@ -14,9 +14,7 @@ interface Star {
   baseAlpha: number;
   twinkleSpeed: number;
   twinklePhase: number;
-  colorR: number;
-  colorG: number;
-  colorB: number;
+  rgb: string;
 }
 
 export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
@@ -37,10 +35,15 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let animationFrameId: number;
+    let animationFrameId = 0;
+    let isRunning = false;
+    let isVisibleInViewport = true;
     let width = window.innerWidth;
     let height = window.innerHeight;
     let dpr = 1;
+    let cachedWarpGrad: CanvasGradient | null = null;
+    let cachedGradW = 0;
+    let cachedGradH = 0;
 
     const updateSize = () => {
       if (!canvas) return;
@@ -49,13 +52,18 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
       const rect = parent ? parent.getBoundingClientRect() : null;
       width = Math.max(1, rect && rect.width > 0 ? rect.width : window.innerWidth);
       height = Math.max(1, rect && rect.height > 0 ? rect.height : window.innerHeight);
-      canvas.width = Math.max(1, Math.round(width * dpr));
-      canvas.height = Math.max(1, Math.round(height * dpr));
+      const targetW = Math.max(1, Math.round(width * dpr));
+      const targetH = Math.max(1, Math.round(height * dpr));
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cachedWarpGrad = null;
     };
 
     updateSize();
-    window.addEventListener('resize', updateSize);
+    window.addEventListener('resize', updateSize, { passive: true });
     const resizeObserver =
       typeof ResizeObserver !== 'undefined' && canvas.parentElement
         ? new ResizeObserver(() => updateSize())
@@ -68,14 +76,14 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
     const numStars = 560;
     const stars: Star[] = [];
     const palette = [
-      [255, 255, 255],
-      [230, 242, 255],
-      [195, 232, 255],
-      [245, 240, 225],
+      '255, 255, 255',
+      '230, 242, 255',
+      '195, 232, 255',
+      '245, 240, 225',
     ];
 
     for (let i = 0; i < numStars; i++) {
-      const col = palette[i % palette.length];
+      const rgb = palette[i % palette.length];
       const z = Math.random() * 1200 + 5;
       stars.push({
         x: (Math.random() - 0.5) * 3200,
@@ -86,15 +94,15 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
         baseAlpha: 0.38 + Math.random() * 0.62,
         twinkleSpeed: 1.5 + Math.random() * 3.5,
         twinklePhase: Math.random() * Math.PI * 2,
-        colorR: col[0],
-        colorG: col[1],
-        colorB: col[2],
+        rgb,
       });
     }
 
     let lastTime = performance.now();
 
     const render = (now: number) => {
+      if (!isRunning) return;
+
       // Delta-time normalized to 60Hz baseline so 120Hz/144Hz/240Hz runs with sub-frame silkiness
       const dtSec = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
       lastTime = now;
@@ -114,15 +122,22 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
       const cy = height * 0.5;
       const maxDim = Math.max(width, height);
 
-      // Subtle atmospheric space haze during warp
+      // Subtle atmospheric space haze during warp (cached gradient geometry)
       if (warpRatio > 0.01) {
-        const maxR = maxDim * 0.78;
-        const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxR);
-        grad.addColorStop(0, `rgba(27, 32, 36, ${0.75 * warpRatio})`);
-        grad.addColorStop(0.55, `rgba(14, 18, 22, ${0.45 * warpRatio})`);
-        grad.addColorStop(1, 'rgba(1, 1, 1, 0)');
-        ctx.fillStyle = grad;
+        if (!cachedWarpGrad || cachedGradW !== width || cachedGradH !== height) {
+          const maxR = maxDim * 0.78;
+          cachedWarpGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxR);
+          cachedWarpGrad.addColorStop(0, 'rgba(27, 32, 36, 0.75)');
+          cachedWarpGrad.addColorStop(0.55, 'rgba(14, 18, 22, 0.45)');
+          cachedWarpGrad.addColorStop(1, 'rgba(1, 1, 1, 0)');
+          cachedGradW = width;
+          cachedGradH = height;
+        }
+        ctx.save();
+        ctx.globalAlpha = warpRatio;
+        ctx.fillStyle = cachedWarpGrad;
         ctx.fillRect(0, 0, width, height);
+        ctx.restore();
       }
 
       // Use max(width, height) * 0.62 so even at z=1200, stars span [-0.99*maxDim, +0.99*maxDim] in both axes
@@ -159,7 +174,7 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
           const prevPy = star.y * prevK + cy;
 
           ctx.beginPath();
-          ctx.strokeStyle = `rgba(${star.colorR}, ${star.colorG}, ${star.colorB}, ${alpha})`;
+          ctx.strokeStyle = `rgba(${star.rgb}, ${alpha.toFixed(3)})`;
           ctx.lineWidth = radius * 1.35;
           ctx.lineCap = 'round';
           ctx.moveTo(prevPx, prevPy);
@@ -167,18 +182,18 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
           ctx.stroke();
 
           ctx.beginPath();
-          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha * 1.25)})`;
+          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha * 1.25).toFixed(3)})`;
           ctx.arc(px, py, radius * 0.85, 0, Math.PI * 2);
           ctx.fill();
         } else {
           ctx.beginPath();
-          ctx.fillStyle = `rgba(${star.colorR}, ${star.colorG}, ${star.colorB}, ${alpha})`;
+          ctx.fillStyle = `rgba(${star.rgb}, ${alpha.toFixed(3)})`;
           ctx.arc(px, py, radius, 0, Math.PI * 2);
           ctx.fill();
 
           if (star.size > 1.55 && star.z < 550) {
             ctx.beginPath();
-            ctx.fillStyle = `rgba(${star.colorR}, ${star.colorG}, ${star.colorB}, ${alpha * 0.24})`;
+            ctx.fillStyle = `rgba(${star.rgb}, ${(alpha * 0.24).toFixed(3)})`;
             ctx.arc(px, py, radius * 2.6, 0, Math.PI * 2);
             ctx.fill();
           }
@@ -188,12 +203,59 @@ export const StarfieldCanvas: React.FC<StarfieldCanvasProps> = ({
       animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    const startLoop = () => {
+      if (!isRunning && isVisibleInViewport && !document.hidden) {
+        isRunning = true;
+        lastTime = performance.now();
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
+    const stopLoop = () => {
+      if (isRunning) {
+        isRunning = false;
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopLoop();
+      } else {
+        startLoop();
+      }
+    };
+
+    const intersectionObserver =
+      typeof IntersectionObserver !== 'undefined'
+        ? new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0];
+              if (entry) {
+                isVisibleInViewport = entry.isIntersecting;
+                if (isVisibleInViewport) {
+                  startLoop();
+                } else {
+                  stopLoop();
+                }
+              }
+            },
+            { threshold: 0.01 }
+          )
+        : null;
+
+    if (intersectionObserver) {
+      intersectionObserver.observe(canvas);
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    startLoop();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      stopLoop();
       window.removeEventListener('resize', updateSize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
     };
   }, []);
 

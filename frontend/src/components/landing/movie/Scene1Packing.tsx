@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { soundEngine } from '../cinema/SoundEngine';
+import TapeDispenserGun from './TapeDispenserGun';
+
+const DIALOGUE_FULL = "Ye Lahore ka urgent COD parcel hai, customer ko kal lazmi milna chahiye.";
 
 export const Scene1Packing: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<SVGSVGElement>(null);
-  const [scrollProgress, setScrollProgress] = useState<number>(0);
-  const [sealProgress, setSealProgress] = useState<number>(0);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const lastSoundProgressRef = useRef<number>(0);
-  const dragStartClientXRef = useRef<number>(0);
-  const dragStartProgressRef = useRef<number>(0);
 
-  // Pupil eye tracking offset (tracks cursor / touch coordinates in SVG space)
-  const [pupilOffset, setPupilOffset] = useState<{ x: number; y: number }>({ x: 0, y: 1.2 });
+  // Only discrete milestone states trigger React re-renders (0 re-renders during scroll/cursor/drag)
+  const [isFullySealed, setIsFullySealed] = useState<boolean>(false);
+  const [isWarehouseMounted, setIsWarehouseMounted] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.scrollY > 40 || window.location.hash.length > 1;
+    }
+    return false;
+  });
 
   // Responsive device orientation tracking for full-bleed camera framing
   const [isPortrait, setIsPortrait] = useState<boolean>(() => {
@@ -22,23 +25,245 @@ export const Scene1Packing: React.FC = () => {
     return false;
   });
 
+  // Mutable high-frequency animation refs (mutated in rAF with zero React reconciliation)
+  const scrollProgressRef = useRef<number>(0);
+  const sealProgressRef = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
+  const isSceneInViewRef = useRef<boolean>(false);
+  const lastSoundProgressRef = useRef<number>(0);
+  const dragStartClientXRef = useRef<number>(0);
+  const dragStartProgressRef = useRef<number>(0);
+  const lastTypedCharCountRef = useRef<number>(-1);
+  const cachedCTMInvRef = useRef<DOMMatrix | null>(null);
+
+  // Direct DOM refs for Cloud Plunge & Title Split Curtain
+  const cloudOverlayRef = useRef<HTMLDivElement>(null);
+  const leftCloudRef = useRef<HTMLDivElement>(null);
+  const rightCloudRef = useRef<HTMLDivElement>(null);
+  const centerFogRef = useRef<HTMLDivElement>(null);
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+  const leftWingRef = useRef<HTMLDivElement>(null);
+  const rightWingRef = useRef<HTMLDivElement>(null);
+  const splitDividerRef = useRef<HTMLDivElement>(null);
+  const scrollPromptRef = useRef<HTMLDivElement>(null);
+
+  // Direct SVG refs for Tariq's Pupils, Tape Sealing, and Typewriter Dialogue
+  const pupilsGroupRef = useRef<SVGGElement>(null);
+  const guideLineRef = useRef<SVGLineElement>(null);
+  const slidePromptGroupRef = useRef<SVGGElement>(null);
+  const appliedTapeGroupRef = useRef<SVGGElement>(null);
+  const tapePoly1Ref = useRef<SVGPolygonElement>(null);
+  const tapePoly2Ref = useRef<SVGPolygonElement>(null);
+  const tapeGunGroupRef = useRef<SVGGElement>(null);
+  const speechBubbleGroupRef = useRef<SVGGElement>(null);
+  const speechLine1Ref = useRef<SVGTextElement>(null);
+  const speechLine2TextRef = useRef<SVGTSpanElement>(null);
+  const speechCursorRef = useRef<SVGTSpanElement>(null);
+
+  const updateCachedCTM = useCallback(() => {
+    if (!trackRef.current) return;
+    try {
+      const ctm = trackRef.current.getScreenCTM();
+      if (ctm) {
+        cachedCTMInvRef.current = ctm.inverse();
+      }
+    } catch (_) {}
+  }, []);
+
+  // Apply scroll progress directly to DOM nodes without triggering React re-renders
+  const applyScrollMutations = useCallback((progress: number) => {
+    scrollProgressRef.current = progress;
+
+    // 1. Cloud Plunge (0.0 -> 0.36)
+    const cloudProgress = Math.max(0, Math.min(1, progress / 0.36));
+    const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.4));
+    const cloudPartLeft = cloudProgress * -60;
+    const cloudPartRight = cloudProgress * 60;
+    const cloudScale = 1 + cloudProgress * 1.8;
+    const fogScale = 1 + cloudProgress * 2.5;
+
+    if (cloudOverlayRef.current) {
+      if (cloudOpacity <= 0.002) {
+        cloudOverlayRef.current.style.display = 'none';
+      } else {
+        cloudOverlayRef.current.style.display = 'block';
+        cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
+      }
+    }
+    if (leftCloudRef.current && cloudOpacity > 0.002) {
+      leftCloudRef.current.style.transform = `translate3d(${cloudPartLeft.toFixed(2)}%, 0, 0) scale3d(${cloudScale.toFixed(3)}, ${cloudScale.toFixed(3)}, 1)`;
+    }
+    if (rightCloudRef.current && cloudOpacity > 0.002) {
+      rightCloudRef.current.style.transform = `translate3d(${cloudPartRight.toFixed(2)}%, 0, 0) scale3d(${cloudScale.toFixed(3)}, ${cloudScale.toFixed(3)}, 1)`;
+    }
+    if (centerFogRef.current && cloudOpacity > 0.002) {
+      centerFogRef.current.style.transform = `scale3d(${fogScale.toFixed(3)}, ${fogScale.toFixed(3)}, 1)`;
+    }
+
+    // 2. Title Split Curtain (0.0 -> 0.26)
+    const titlePartProgress = Math.max(0, Math.min(1, progress / 0.26));
+    const titleOpacity = Math.max(0, 1 - Math.pow(titlePartProgress, 1.3));
+    const splitOffsetPercent = titlePartProgress * 125;
+    const splitDividerOpacity = Math.max(0, 1 - titlePartProgress * 3.5);
+
+    if (titleContainerRef.current) {
+      if (titleOpacity <= 0.002) {
+        titleContainerRef.current.style.display = 'none';
+      } else {
+        titleContainerRef.current.style.display = 'flex';
+        titleContainerRef.current.style.opacity = titleOpacity.toFixed(3);
+      }
+    }
+    if (leftWingRef.current && titleOpacity > 0.002) {
+      leftWingRef.current.style.transform = `translate3d(-${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+    }
+    if (rightWingRef.current && titleOpacity > 0.002) {
+      rightWingRef.current.style.transform = `translate3d(${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+    }
+    if (splitDividerRef.current && titleOpacity > 0.002) {
+      splitDividerRef.current.style.opacity = splitDividerOpacity.toFixed(3);
+    }
+    if (scrollPromptRef.current && titleOpacity > 0.002) {
+      scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 4).toFixed(3);
+    }
+
+    // 3. Occlusion Gating: Pause warehouse SVG CSS animations when completely hidden behind opaque clouds
+    if (trackRef.current) {
+      const shouldPauseWarehouse = !isSceneInViewRef.current || progress < 0.015;
+      trackRef.current.classList.toggle('warehouse-paused', shouldPauseWarehouse);
+      trackRef.current.style.visibility = progress < 0.005 ? 'hidden' : 'visible';
+    }
+
+    // 4. Typewriter Dialogue (starts when warehouse is revealed at scrollProgress > 0.34)
+    const dialogueTrigger = Math.max(0, Math.min(1, (progress - 0.34) / 0.32));
+    const typedCharCount = Math.floor(dialogueTrigger * DIALOGUE_FULL.length);
+
+    if (typedCharCount !== lastTypedCharCountRef.current) {
+      lastTypedCharCountRef.current = typedCharCount;
+      if (speechBubbleGroupRef.current) {
+        speechBubbleGroupRef.current.style.display = typedCharCount > 0 ? 'block' : 'none';
+      }
+      if (typedCharCount > 0) {
+        const displayed = DIALOGUE_FULL.slice(0, typedCharCount);
+        const isComplete = typedCharCount >= DIALOGUE_FULL.length;
+        if (speechLine1Ref.current) {
+          speechLine1Ref.current.textContent = `"${displayed.slice(0, 36)}`;
+        }
+        if (speechLine2TextRef.current) {
+          speechLine2TextRef.current.textContent = isComplete
+            ? `${displayed.slice(36)}"`
+            : displayed.slice(36);
+        }
+        if (speechCursorRef.current) {
+          speechCursorRef.current.style.display = isComplete ? 'none' : 'inline';
+        }
+      }
+    }
+  }, []);
+
+  // Apply tape sealing mutations directly to SVG attributes without React re-renders
+  const applyTapeMutations = useCallback(
+    (progress: number) => {
+      const seamLen = isPortrait ? 360 : 380;
+      const w = progress * seamLen;
+      const baseX = isPortrait ? 390 : 803;
+      const baseY = isPortrait ? 873.5 : 697;
+      const topY = isPortrait ? 869 : 692;
+      const skewX = isPortrait ? 5 : 6;
+      const gunY = isPortrait ? 850 : 674;
+
+      if (guideLineRef.current) {
+        guideLineRef.current.setAttribute('x1', String(Math.max(baseX, baseX + w)));
+      }
+      if (slidePromptGroupRef.current) {
+        const promptOpacity = Math.max(0, 1 - progress * 1.6);
+        slidePromptGroupRef.current.style.opacity = promptOpacity.toFixed(3);
+        slidePromptGroupRef.current.style.display = progress < 0.65 ? 'block' : 'none';
+      }
+      if (appliedTapeGroupRef.current) {
+        appliedTapeGroupRef.current.style.display = w > 0 ? 'block' : 'none';
+      }
+      if (w > 0) {
+        const pts = `${baseX},${baseY} ${(baseX + w).toFixed(1)},${baseY} ${(baseX + w + skewX).toFixed(1)},${topY} ${baseX + skewX},${topY}`;
+        if (tapePoly1Ref.current) tapePoly1Ref.current.setAttribute('points', pts);
+        if (tapePoly2Ref.current) tapePoly2Ref.current.setAttribute('points', pts);
+      }
+      if (tapeGunGroupRef.current) {
+        tapeGunGroupRef.current.setAttribute('transform', `translate(${(baseX + w).toFixed(1)}, ${gunY})`);
+      }
+    },
+    [isPortrait]
+  );
+
+  // Mount Warehouse SVG when nearing Scene 1 & pause animations when offscreen
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setIsWarehouseMounted(true);
+      isSceneInViewRef.current = true;
+      return;
+    }
+
+    const mountObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry && entry.isIntersecting) {
+          setIsWarehouseMounted(true);
+          mountObserver.disconnect();
+        }
+      },
+      { rootMargin: '350px 0px' }
+    );
+    mountObserver.observe(el);
+
+    const activeObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        isSceneInViewRef.current = entry.isIntersecting;
+        if (trackRef.current) {
+          const shouldPause = !entry.isIntersecting || scrollProgressRef.current < 0.015;
+          trackRef.current.classList.toggle('warehouse-paused', shouldPause);
+        }
+      },
+      { threshold: 0.01 }
+    );
+    activeObserver.observe(el);
+
+    return () => {
+      mountObserver.disconnect();
+      activeObserver.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     const handleResize = () => {
       const portrait = window.innerWidth < 768 || window.innerWidth / window.innerHeight < 0.95;
       setIsPortrait(portrait);
+      cachedCTMInvRef.current = null;
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Character dialogue
-  const dialogueFull = "Ye Lahore ka urgent COD parcel hai, customer ko kal lazmi milna chahiye.";
-
-  // Scroll listener ONLY for camera descent through clouds (0.0 to 0.40) & dialogue reveal
-  // NOTE: Package sealing is NEVER affected by scroll - only direct user interaction.
+  // Re-sync direct DOM state when warehouse mounts or orientation changes
   useEffect(() => {
-    const handleScroll = () => {
+    if (isWarehouseMounted) {
+      lastTypedCharCountRef.current = -1;
+      applyScrollMutations(scrollProgressRef.current);
+      applyTapeMutations(sealProgressRef.current);
+      updateCachedCTM();
+    }
+  }, [isWarehouseMounted, isPortrait, applyScrollMutations, applyTapeMutations, updateCachedCTM]);
+
+  // Coalesced rAF Scroll Listener (0 React state re-renders)
+  useEffect(() => {
+    let rafId = 0;
+    let ticking = false;
+
+    const updateOnScroll = () => {
+      ticking = false;
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
@@ -48,49 +273,74 @@ export const Scene1Packing: React.FC = () => {
 
       const currentScroll = -rect.top;
       const progress = Math.max(0, Math.min(1, currentScroll / totalScrollable));
-      setScrollProgress(progress);
+      if (progress > 0 && !isWarehouseMounted) {
+        setIsWarehouseMounted(true);
+      }
+      applyScrollMutations(progress);
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        rafId = requestAnimationFrame(updateOnScroll);
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Track cursor position to have Tariq's pupils watch the cursor in real time
-  useEffect(() => {
-    let rafId: number;
-    const handlePointerMove = (e: PointerEvent) => {
+    updateOnScroll();
+    return () => {
       cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!trackRef.current) return;
-        const svg = trackRef.current;
-        const point = svg.createSVGPoint();
-        point.x = e.clientX;
-        point.y = e.clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return;
-        const svgPoint = point.matrixTransform(ctm.inverse());
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [applyScrollMutations, isWarehouseMounted]);
 
-        // Tariq's head eye position in SVG coordinates
-        const eyeX = isPortrait ? 540 : 960;
-        const eyeY = isPortrait ? 630 : 496;
+  // Track cursor position to have Tariq's pupils watch the cursor in real time (0 React re-renders)
+  useEffect(() => {
+    let rafId = 0;
+    let latestX = 0;
+    let latestY = 0;
+    let pending = false;
 
-        const dx = svgPoint.x - eyeX;
-        const dy = svgPoint.y - eyeY;
-        const dist = Math.hypot(dx, dy);
-        const angle = Math.atan2(dy, dx);
+    const updatePupils = () => {
+      pending = false;
+      if (!trackRef.current || !pupilsGroupRef.current) return;
+      if (!isSceneInViewRef.current || scrollProgressRef.current < 0.05) return;
 
-        // Normalize and clamp pupil movement within the eye socket
-        // Eye white rx is ~4.5, ry is ~2.4. Max pupil travel is 2.2px horizontal, 1.3px vertical.
-        const intensity = Math.min(1, dist / 220);
-        const maxOffsetX = 2.2;
-        const maxOffsetY = 1.3;
+      if (!cachedCTMInvRef.current) {
+        updateCachedCTM();
+      }
+      const inv = cachedCTMInvRef.current;
+      if (!inv) return;
 
-        setPupilOffset({
-          x: Math.cos(angle) * maxOffsetX * intensity,
-          y: Math.sin(angle) * maxOffsetY * intensity,
-        });
-      });
+      const svg = trackRef.current;
+      const point = svg.createSVGPoint();
+      point.x = latestX;
+      point.y = latestY;
+      const svgPoint = point.matrixTransform(inv);
+
+      const eyeX = isPortrait ? 540 : 960;
+      const eyeY = isPortrait ? 630 : 496;
+
+      const dx = svgPoint.x - eyeX;
+      const dy = svgPoint.y - eyeY;
+      const dist = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+
+      const intensity = Math.min(1, dist / 220);
+      const px = Math.cos(angle) * 2.2 * intensity;
+      const py = Math.sin(angle) * 1.3 * intensity;
+
+      pupilsGroupRef.current.setAttribute('transform', `translate(${px.toFixed(2)}, ${py.toFixed(2)})`);
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isSceneInViewRef.current || scrollProgressRef.current < 0.05) return;
+      latestX = e.clientX;
+      latestY = e.clientY;
+      if (!pending) {
+        pending = true;
+        rafId = requestAnimationFrame(updatePupils);
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
@@ -98,21 +348,23 @@ export const Scene1Packing: React.FC = () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handlePointerMove);
     };
-  }, [isPortrait]);
+  }, [isPortrait, updateCachedCTM]);
 
-  // Handle Dragging to Seal Tape across the box seam with smooth delta dragging
-  // Prevents teleporting or clicking anywhere to trigger early sealing
+  // Handle Dragging to Seal Tape across the box seam with smooth delta dragging (0 React re-renders until sealed)
   const updateDragFromClientX = useCallback(
     (clientX: number) => {
       if (!trackRef.current) return;
+      if (!cachedCTMInvRef.current) {
+        updateCachedCTM();
+      }
+      const inv = cachedCTMInvRef.current;
+      if (!inv) return;
+
       const svg = trackRef.current;
       const point1 = svg.createSVGPoint();
       point1.x = dragStartClientXRef.current;
       const point2 = svg.createSVGPoint();
       point2.x = clientX;
-      const ctm = svg.getScreenCTM();
-      if (!ctm) return;
-      const inv = ctm.inverse();
       const svgX1 = point1.matrixTransform(inv).x;
       const svgX2 = point2.matrixTransform(inv).x;
       const deltaSvgX = svgX2 - svgX1;
@@ -121,89 +373,53 @@ export const Scene1Packing: React.FC = () => {
       const addedProgress = deltaSvgX / seamLength;
       const targetProgress = Math.max(0, Math.min(1, dragStartProgressRef.current + addedProgress));
 
-      setSealProgress((prev) => {
-        // Can only advance forward as user physically pulls rightward across seam
-        const next = Math.max(prev, targetProgress);
-        if (next - lastSoundProgressRef.current > 0.12) {
-          soundEngine.playTapePull();
-          lastSoundProgressRef.current = next;
+      const prev = sealProgressRef.current;
+      const next = Math.max(prev, targetProgress);
+
+      if (next - lastSoundProgressRef.current > 0.12) {
+        soundEngine.playTapePull();
+        lastSoundProgressRef.current = next;
+      }
+
+      if (next >= 0.99) {
+        sealProgressRef.current = 1;
+        applyTapeMutations(1);
+        if (lastSoundProgressRef.current < 0.99) {
+          soundEngine.playCartonThud();
+          soundEngine.playSuccessChime();
+          lastSoundProgressRef.current = 1;
         }
-        // SEALED stamp and chime strictly only trigger when the tape physically reaches the very end
-        if (next >= 0.99) {
-          if (lastSoundProgressRef.current < 0.99) {
-            soundEngine.playCartonThud();
-            soundEngine.playSuccessChime();
-            lastSoundProgressRef.current = 1;
-          }
-          return 1;
-        }
-        return next;
-      });
+        setIsFullySealed(true);
+        return;
+      }
+
+      sealProgressRef.current = next;
+      applyTapeMutations(next);
     },
-    [isPortrait]
+    [applyTapeMutations, isPortrait, updateCachedCTM]
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    setIsDragging(true);
+    updateCachedCTM();
+    isDraggingRef.current = true;
     dragStartClientXRef.current = e.clientX;
-    dragStartProgressRef.current = sealProgress;
+    dragStartProgressRef.current = sealProgressRef.current;
     try {
       (e.target as Element).setPointerCapture(e.pointerId);
     } catch (_) {}
+
+    const onMove = (ev: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      updateDragFromClientX(ev.clientX);
+    };
+    const onUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerup', onUp, { passive: true });
   };
-
-  useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDragging) return;
-      updateDragFromClientX(e.clientX);
-    };
-
-    const handlePointerUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-      }
-    };
-
-    if (isDragging) {
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-    }
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isDragging, updateDragFromClientX]);
-
-  // =========================================================================
-  // ANIMATION TIMINGS & VALUES:
-  // =========================================================================
-
-  // 1. Cloud Plunge (0.0 -> 0.36)
-  const cloudProgress = Math.max(0, Math.min(1, scrollProgress / 0.36));
-  const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.4));
-  const cloudPartLeft = cloudProgress * -60; // percentage
-  const cloudPartRight = cloudProgress * 60; // percentage
-  const cloudScale = 1 + cloudProgress * 1.8;
-
-  // Title on clouds
-  const titleOpacity =
-    scrollProgress < 0.04
-      ? scrollProgress / 0.04
-      : scrollProgress < 0.20
-      ? 1
-      : Math.max(0, 1 - (scrollProgress - 0.20) / 0.14);
-  const titleScale = 0.96 + scrollProgress * 0.3;
-
-  // 2. Seam Tape Geometry
-  const seamLength = isPortrait ? 360 : 380;
-  const tapeWidth = sealProgress * seamLength;
-  const isFullySealed = sealProgress >= 0.99;
-
-  // 3. Typewriter Dialogue (starts when warehouse is revealed at scrollProgress > 0.34)
-  const dialogueTrigger = Math.max(0, Math.min(1, (scrollProgress - 0.34) / 0.32));
-  const typedCharCount = Math.floor(dialogueTrigger * dialogueFull.length);
-  const displayedDialogue = dialogueFull.slice(0, typedCharCount);
-  const isTypingComplete = typedCharCount >= dialogueFull.length;
 
   return (
     <div
@@ -211,30 +427,32 @@ export const Scene1Packing: React.FC = () => {
       className="relative w-full h-[300vh] bg-[#0b0b0b]"
       id="movie-scene-1"
       data-story-scene="true"
-      style={{ contentVisibility: 'auto' }}
     >
       {/* Sticky Full-Screen Viewport - 100vw x 100vh Edge-to-Edge */}
       <div className="sticky top-0 left-0 w-full h-screen h-dvh overflow-hidden flex items-center justify-center bg-[#07090e]">
         <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-[#07090e]">
+          {isWarehouseMounted && (
           <svg
             ref={trackRef}
             viewBox={isPortrait ? '0 0 1080 1520' : '0 0 1920 1080'}
-            className="w-full h-full object-cover select-none"
+            className="w-full h-full object-cover select-none warehouse-paused"
             preserveAspectRatio="xMidYMid slice"
+            style={{ visibility: 'hidden' }}
           >
             <defs>
-              {/* Keyframe Animations */}
+              {/* Keyframe Animations (100% GPU-Composited Opacity & Transform Only - Zero Filter Thrashing) */}
               <style>{`
+                .warehouse-paused * {
+                  animation-play-state: paused !important;
+                }
                 @keyframes stampSlam {
                   0% {
                     opacity: 0;
                     transform: scale(3.2) rotate(-30deg);
-                    filter: blur(4px);
                   }
                   55% {
                     opacity: 0.98;
                     transform: scale(0.90) rotate(-8deg);
-                    filter: blur(0px);
                   }
                   75% {
                     transform: scale(1.06) rotate(-13deg);
@@ -248,33 +466,15 @@ export const Scene1Packing: React.FC = () => {
                   animation: stampSlam 0.42s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
                 }
 
-                /* Industrial High-Bay Pendant Lamp Periodic Micro-Flicker */
+                /* Industrial High-Bay Pendant Lamp Periodic Micro-Flicker (Pure Opacity) */
                 @keyframes industrialLampFlicker {
-                  0%, 68%, 71%, 74%, 78%, 100% {
-                    opacity: 1;
-                    filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.45));
-                  }
-                  69% {
-                    opacity: 0.24;
-                    filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.05));
-                  }
-                  70% {
-                    opacity: 0.92;
-                    filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.35));
-                  }
-                  72% {
-                    opacity: 0.14;
-                    filter: drop-shadow(0 0 0px transparent);
-                  }
-                  73% {
-                    opacity: 0.65;
-                  }
-                  75% {
-                    opacity: 0.20;
-                  }
-                  76% {
-                    opacity: 0.96;
-                  }
+                  0%, 68%, 71%, 74%, 78%, 100% { opacity: 1; }
+                  69% { opacity: 0.24; }
+                  70% { opacity: 0.92; }
+                  72% { opacity: 0.14; }
+                  73% { opacity: 0.65; }
+                  75% { opacity: 0.20; }
+                  76% { opacity: 0.96; }
                 }
                 .animate-lamp-flicker {
                   animation: industrialLampFlicker 6.2s infinite;
@@ -307,81 +507,67 @@ export const Scene1Packing: React.FC = () => {
                   animation: characterEyeBlink 4.2s ease-in-out infinite;
                 }
 
-                /* Realistic Natural Tea Steam Billowing & Drifting */
-                @keyframes naturalSteamDrift1 {
+                /* Continuous Delicate Karak Tea Steam (Continuous Ribbon Flow) */
+                .tea-smoke-container {
+                  position: relative;
+                  width: 100%;
+                  height: 100%;
+                  pointer-events: none;
+                  filter: url('#tea-smoke-filter') blur(4px);
+                  transform: translateZ(0);
+                }
+
+                .tea-smoke-container span {
+                  position: absolute;
+                  bottom: 0;
+                  left: 50%;
+                  width: 11px;
+                  height: 11px;
+                  background: radial-gradient(circle, rgba(255, 250, 240, 0.45) 0%, rgba(254, 243, 199, 0.25) 45%, rgba(255, 255, 255, 0.08) 75%, transparent 100%);
+                  border-radius: 50%;
+                  transform: translateX(-50%) scale(0.7);
+                  animation: teaSteamContinuous 6.5s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+                  will-change: transform, opacity;
+                }
+
+                /* 12 Continuously Overlapping Steam Particles (0.54s step interval for slow, peaceful steam) */
+                .tea-smoke-container span:nth-child(1)  { animation-delay: 0.00s; left: 48%; }
+                .tea-smoke-container span:nth-child(2)  { animation-delay: 0.54s; left: 52%; width: 12px; height: 12px; }
+                .tea-smoke-container span:nth-child(3)  { animation-delay: 1.08s; left: 47%; }
+                .tea-smoke-container span:nth-child(4)  { animation-delay: 1.62s; left: 53%; width: 13px; height: 13px; }
+                .tea-smoke-container span:nth-child(5)  { animation-delay: 2.16s; left: 49%; }
+                .tea-smoke-container span:nth-child(6)  { animation-delay: 2.70s; left: 51%; width: 10px; height: 10px; }
+                .tea-smoke-container span:nth-child(7)  { animation-delay: 3.24s; left: 48%; }
+                .tea-smoke-container span:nth-child(8)  { animation-delay: 3.78s; left: 52%; width: 12px; height: 12px; }
+                .tea-smoke-container span:nth-child(9)  { animation-delay: 4.32s; left: 46%; }
+                .tea-smoke-container span:nth-child(10) { animation-delay: 4.86s; left: 53%; width: 11px; height: 11px; }
+                .tea-smoke-container span:nth-child(11) { animation-delay: 5.40s; left: 50%; }
+                .tea-smoke-container span:nth-child(12) { animation-delay: 5.94s; left: 48%; width: 12px; height: 12px; }
+
+                /* Continuous, Slender, Ethereal Slow-Rising Vapor */
+                @keyframes teaSteamContinuous {
                   0% {
+                    bottom: 0%;
+                    transform: translateX(-50%) scale(0.7);
                     opacity: 0;
-                    transform: translate(0, 0) scale(0.6) rotate(0deg);
                   }
-                  20% {
-                    opacity: 0.75;
-                    transform: translate(-3px, -15px) scale(0.9) rotate(-3deg);
+                  15% {
+                    opacity: 0.32;
+                    transform: translateX(-50%) scale(0.95);
                   }
-                  50% {
-                    opacity: 0.55;
-                    transform: translate(4px, -34px) scale(1.3) rotate(4deg);
+                  42% {
+                    transform: translateX(calc(-50% - 3px)) scale(1.3);
+                    opacity: 0.22;
                   }
-                  75% {
-                    opacity: 0.25;
-                    transform: translate(-2px, -52px) scale(1.7) rotate(-2deg);
+                  72% {
+                    transform: translateX(calc(-50% + 4px)) scale(1.65);
+                    opacity: 0.12;
                   }
                   100% {
+                    bottom: 100%;
+                    transform: translateX(calc(-50% - 2px)) scale(2.05);
                     opacity: 0;
-                    transform: translate(3px, -70px) scale(2.2) rotate(3deg);
                   }
-                }
-                @keyframes naturalSteamDrift2 {
-                  0% {
-                    opacity: 0;
-                    transform: translate(0, 0) scale(0.5) rotate(0deg);
-                  }
-                  25% {
-                    opacity: 0.7;
-                    transform: translate(4px, -18px) scale(0.85) rotate(4deg);
-                  }
-                  60% {
-                    opacity: 0.45;
-                    transform: translate(-4px, -38px) scale(1.25) rotate(-3deg);
-                  }
-                  85% {
-                    opacity: 0.2;
-                    transform: translate(1px, -54px) scale(1.6) rotate(1deg);
-                  }
-                  100% {
-                    opacity: 0;
-                    transform: translate(2px, -68px) scale(1.9) rotate(2deg);
-                  }
-                }
-                @keyframes naturalSteamDrift3 {
-                  0% {
-                    opacity: 0;
-                    transform: translate(0, 0) scale(0.7) rotate(0deg);
-                  }
-                  20% {
-                    opacity: 0.8;
-                    transform: translate(-2px, -12px) scale(0.95) rotate(-2deg);
-                  }
-                  50% {
-                    opacity: 0.5;
-                    transform: translate(3px, -28px) scale(1.4) rotate(3deg);
-                  }
-                  80% {
-                    opacity: 0.18;
-                    transform: translate(-3px, -48px) scale(1.8) rotate(-4deg);
-                  }
-                  100% {
-                    opacity: 0;
-                    transform: translate(0px, -62px) scale(2.3) rotate(0deg);
-                  }
-                }
-                .animate-steam-natural-1 {
-                  animation: naturalSteamDrift1 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-                }
-                .animate-steam-natural-2 {
-                  animation: naturalSteamDrift2 3.8s cubic-bezier(0.4, 0, 0.2, 1) 1.2s infinite;
-                }
-                .animate-steam-natural-3 {
-                  animation: naturalSteamDrift3 4.2s cubic-bezier(0.4, 0, 0.2, 1) 2.3s infinite;
                 }
 
                 @keyframes moteDriftA {
@@ -402,22 +588,12 @@ export const Scene1Packing: React.FC = () => {
                 .animate-blink-dot { animation: blinkDot 1.4s step-end infinite; }
               `}</style>
 
-              {/* Filters for Volumetric Sunlight, Soft Steam & Shadows */}
-              <filter id="naturalSteamBlur" x="-60%" y="-80%" width="220%" height="240%">
-                <feGaussianBlur stdDeviation="3.0" result="blur" />
-              </filter>
-              <filter id="sunGlowFilter" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
-              </filter>
-              <filter id="sunShaftFilter" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="5" result="blur" />
-              </filter>
-              <filter id="shadowBlur" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="6" result="blur" />
-              </filter>
-              <filter id="contactShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="2.5" result="blur" />
-              </filter>
+              {/* Hardware-Accelerated Radial Shadow Gradient (Zero Filter Convolution) */}
+              <radialGradient id="softShadowRadial" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#020617" stopOpacity="0.85" />
+                <stop offset="55%" stopColor="#020617" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+              </radialGradient>
 
               {/* Natural Tea Vapor Gradient */}
               <linearGradient id="teaVaporGrad" x1="0%" y1="100%" x2="0%" y2="0%">
@@ -426,6 +602,20 @@ export const Scene1Packing: React.FC = () => {
                 <stop offset="85%" stopColor="#ffffff" stopOpacity="0.25" />
                 <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
               </linearGradient>
+
+              {/* Organic Fractal Steam Turbulence & Displacement Filter (Reference Implementation) */}
+              <filter id="tea-smoke-filter" x="-30%" y="-30%" width="160%" height="160%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+
+              {/* Register Paper Bounds ClipPaths */}
+              <clipPath id="desktopRegisterSheetClip">
+                <rect x="-51" y="-70" width="102" height="142" rx="2" />
+              </clipPath>
+              <clipPath id="mobileRegisterSheetClip">
+                <rect x="-42" y="-56" width="84" height="116" rx="2" />
+              </clipPath>
 
               {/* CARDBOARD KRAFT TEXTURE PATTERNS */}
               {/* Front Face Horizontal Flute Grain Pattern */}
@@ -626,11 +816,13 @@ export const Scene1Packing: React.FC = () => {
                   </text>
                 </g>
 
-                {/* Central Pendant Lamp with Industrial Flicker */}
+                {/* Central Pendant Lamp Fixture (Permanent Solid Metal) */}
+                <line x1="540" y1="68" x2="540" y2="120" stroke="#475569" strokeWidth="2.5" />
+                <path d="M515 120 L565 120 L575 135 L505 135 Z" fill="#1e293b" stroke="#64748b" strokeWidth="1.2" />
+                {/* ONLY the glowing bulb light flickers */}
                 <g className="animate-lamp-flicker">
-                  <line x1="540" y1="68" x2="540" y2="120" stroke="#475569" strokeWidth="2.5" />
-                  <path d="M515 120 L565 120 L575 135 L505 135 Z" fill="#1e293b" stroke="#64748b" strokeWidth="1.2" />
-                  <ellipse cx="540" cy="135" rx="16" ry="4" fill="#fef08a" filter="drop-shadow(0 0 10px #fbbf24)" />
+                  <ellipse cx="540" cy="135" rx="22" ry="7" fill="#fbbf24" opacity="0.35" />
+                  <ellipse cx="540" cy="135" rx="16" ry="4" fill="#fef08a" />
                 </g>
                 {/* Synchronized Flickering Downward Light Cone */}
                 <polygon
@@ -682,9 +874,9 @@ export const Scene1Packing: React.FC = () => {
                   <circle cx="120" cy="215" r="9" fill="#1e293b" />
 
                   {/* Multiple Volumetric God Rays */}
-                  <polygon points="10,60 210,60 0,720 -350,720" fill="url(#sunBeamBroad)" filter="url(#sunGlowFilter)" opacity="0.8" />
-                  <polygon points="30,80 140,80 -50,680 -200,680" fill="url(#sunBeamCore)" filter="url(#sunShaftFilter)" opacity="0.9" />
-                  <polygon points="120,60 190,60 50,680 -30,680" fill="url(#sunBeamCore)" filter="url(#sunShaftFilter)" opacity="0.75" />
+                  <polygon points="10,60 210,60 0,720 -350,720" fill="url(#sunBeamBroad)" opacity="0.8" />
+                  <polygon points="30,80 140,80 -50,680 -200,680" fill="url(#sunBeamCore)" opacity="0.9" />
+                  <polygon points="120,60 190,60 50,680 -30,680" fill="url(#sunBeamCore)" opacity="0.75" />
                 </g>
 
                 {/* Animated Dust Motes Inside Sunbeams */}
@@ -703,7 +895,6 @@ export const Scene1Packing: React.FC = () => {
                       r={mote.r}
                       fill="#fef08a"
                       className={mote.cls}
-                      filter="drop-shadow(0 0 4px #fbbf24)"
                     />
                   ))}
                 </g>
@@ -738,15 +929,14 @@ export const Scene1Packing: React.FC = () => {
 
                   {/* Eyes Group with Periodic Blink and Real-Time Cursor Tracking */}
                   <g className="animate-eye-blink" style={{ transformOrigin: '0px 70px' }}>
-                    {/* Left Eye */}
                     <ellipse cx="-12" cy="70" rx="4.2" ry="2.3" fill="#ffffff" />
-                    <circle cx={-12 + pupilOffset.x} cy={70 + pupilOffset.y} r="1.8" fill="#111827" />
-                    <circle cx={-12 + pupilOffset.x - 0.5} cy={70 + pupilOffset.y - 0.5} r="0.45" fill="#ffffff" />
-
-                    {/* Right Eye */}
                     <ellipse cx="12" cy="70" rx="4.2" ry="2.3" fill="#ffffff" />
-                    <circle cx={12 + pupilOffset.x} cy={70 + pupilOffset.y} r="1.8" fill="#111827" />
-                    <circle cx={12 + pupilOffset.x - 0.5} cy={70 + pupilOffset.y - 0.5} r="0.45" fill="#ffffff" />
+                    <g ref={pupilsGroupRef} transform="translate(0, 1.2)">
+                      <circle cx="-12" cy="70" r="1.8" fill="#111827" />
+                      <circle cx="-12.5" cy="69.5" r="0.45" fill="#ffffff" />
+                      <circle cx="12" cy="70" r="1.8" fill="#111827" />
+                      <circle cx="11.5" cy="69.5" r="0.45" fill="#ffffff" />
+                    </g>
                   </g>
 
                   {/* Facial Details */}
@@ -797,8 +987,8 @@ export const Scene1Packing: React.FC = () => {
 
                     {/* Tariq's Staff ID Card Badge (Hanging Dead-Center from Swivel Clasp) */}
                     <g transform="translate(0, 175)">
-                      {/* Transparent Badge Sleeve with drop shadow */}
-                      <rect x="-15" y="0" width="30" height="40" rx="2.5" fill="#ffffff" stroke="#94a3b8" strokeWidth="0.9" filter="drop-shadow(0 2px 5px rgba(0,0,0,0.4))" />
+                      {/* Transparent Badge Sleeve */}
+                      <rect x="-15" y="0" width="30" height="40" rx="2.5" fill="#ffffff" stroke="#94a3b8" strokeWidth="0.9" />
                       {/* Lanyard Hole Punch Slot */}
                       <rect x="-4.5" y="2.5" width="9" height="2" rx="1" fill="#475569" />
                       {/* Header Navy Band */}
@@ -912,7 +1102,7 @@ export const Scene1Packing: React.FC = () => {
                 {/* 1. Authentic Steaming Dhabba Chai Glass & Saucer (Far Left Corner) */}
                 <g transform="translate(100, 840)">
                   {/* Chai Directional Cast Shadow */}
-                  <ellipse cx="6" cy="56" rx="22" ry="8" fill="#000000" opacity="0.5" filter="url(#shadowBlur)" />
+                  <ellipse cx="6" cy="56" rx="28" ry="11" fill="url(#softShadowRadial)" opacity="0.85" />
                   {/* Stainless Steel Saucer */}
                   <ellipse cx="14" cy="50" rx="22" ry="6" fill="#94a3b8" stroke="#cbd5e1" strokeWidth="1" />
                   <ellipse cx="14" cy="48" rx="18" ry="4.5" fill="#cbd5e1" />
@@ -923,39 +1113,31 @@ export const Scene1Packing: React.FC = () => {
                   {/* Specular Catchlight */}
                   <ellipse cx="14" cy="15" rx="10" ry="2" fill="#ffffff" opacity="0.6" />
 
-                  {/* Natural Billowing Hot Chai Steam Wisps */}
-                  <g filter="url(#naturalSteamBlur)" style={{ transformOrigin: '14px 10px' }}>
-                    <path
-                      d="M 12 12 Q 8 2 14 -12 T 10 -34 T 16 -54"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="5"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-1"
-                    />
-                    <path
-                      d="M 9 14 Q 3 4 11 -8 T 5 -28 T 12 -46"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="4"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-2"
-                    />
-                    <path
-                      d="M 17 14 Q 22 6 15 -6 T 20 -24 T 14 -42"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="3.5"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-3"
-                    />
-                  </g>
+                  {/* Glowing Hot Tea Surface Base */}
+                  <ellipse cx="14" cy="15" rx="7.5" ry="2" fill="#fef3c7" opacity="0.3" />
+
+                  {/* Continuous Delicate Karak Tea Steam */}
+                  <foreignObject
+                    x="-3"
+                    y="-110"
+                    width="34"
+                    height="125"
+                    className="pointer-events-none"
+                    style={{ overflow: 'visible' }}
+                  >
+                    <div className="tea-smoke-container">
+                      <span /><span /><span /><span />
+                      <span /><span /><span /><span />
+                      <span /><span /><span /><span />
+                    </div>
+                  </foreignObject>
                 </g>
 
                 {/* 2. DAILY DISPATCH REGISTER (SECURELY ON TABLE, CENTERED AT x=210, y=930) */}
                 <g transform="translate(210, 930) rotate(165)">
-                  {/* Hardbound Register Base with Shadow */}
-                  <rect x="-50" y="-70" width="100" height="140" rx="4" fill="#78350f" stroke="#451a03" strokeWidth="1.5" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.6))" />
+                  {/* Hardbound Register Base */}
+                  <rect x="-52" y="-66" width="104" height="142" rx="4" fill="#000000" opacity="0.35" />
+                  <rect x="-50" y="-70" width="100" height="140" rx="4" fill="#78350f" stroke="#451a03" strokeWidth="1.5" />
                   {/* Brass Corner Protectors */}
                   <polygon points="-50,-70 -38,-70 -50,-58" fill="#d97706" />
                   <polygon points="50,-70 38,-70 50,-58" fill="#d97706" />
@@ -964,29 +1146,43 @@ export const Scene1Packing: React.FC = () => {
                   {/* Metal Clamp (At Top From Tariq's Perspective) */}
                   <rect x="-25" y="-78" width="50" height="15" rx="2" fill="#94a3b8" stroke="#475569" strokeWidth="1" />
                   <circle cx="0" cy="-71" r="2.5" fill="#475569" />
-                  {/* Ledger Page */}
+                  {/* Ledger Page Sheet */}
                   <rect x="-44" y="-58" width="88" height="120" rx="2" fill="#fdfbf7" />
-                  {/* Header facing Tariq */}
-                  <text x="-40" y="-46" fill="#0f172a" fontSize="5.5" fontFamily="sans-serif" fontWeight="900">
-                    DAILY DISPATCH REGISTER
-                  </text>
-                  <text x="-40" y="-38" fill="#475569" fontSize="4.2" fontFamily="monospace">
-                    BATCH #PK-409 • 07:30 PKT
-                  </text>
-                  <line x1="-40" y1="-34" x2="40" y2="-34" stroke="#cbd5e1" strokeWidth="0.8" />
-                  {/* Lined Ledger Rows */}
-                  <g transform="translate(-40, -24)">
-                    <text x="0" y="0" fill="#10b981" fontSize="5.0" fontFamily="monospace" fontWeight="bold">
-                      [✓] ORD-8841 (ISB)
+
+                  {/* Strictly Clipped Register Content */}
+                  <g clipPath="url(#mobileRegisterSheetClip)">
+                    {/* Header facing Tariq */}
+                    <text x="-38" y="-46" fill="#0f172a" fontSize="5.0" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.2">
+                      DAILY DISPATCH REGISTER
                     </text>
-                    <rect x="-2" y="5" width="80" height="11" fill="#fef08a" rx="1" />
-                    <text x="0" y="13" fill="#991b1b" fontSize="5.0" fontFamily="monospace" fontWeight="900">
-                      [➔] ORD-8842 (LHR) COD
+                    <text x="-38" y="-39" fill="#64748b" fontSize="3.8" fontFamily="monospace">
+                      BATCH #PK-409 • 07:30 PKT
                     </text>
-                    <text x="0" y="26" fill="#64748b" fontSize="5.0" fontFamily="monospace">
-                      [ ] ORD-8843 (KHI)
+                    <line x1="-38" y1="-35" x2="38" y2="-35" stroke="#cbd5e1" strokeWidth="0.8" />
+
+                    {/* Lined Ledger Rows Constrained Within Margins */}
+                    <text x="-36" y="-24" fill="#059669" fontSize="4.4" fontFamily="monospace" fontWeight="bold">
+                      [✓] ORD-8841 ISB
+                    </text>
+                    <rect x="-38" y="-18" width="76" height="14" fill="#fef08a" stroke="#ca8a04" strokeWidth="0.5" rx="1" />
+                    <text x="-36" y="-10" fill="#991b1b" fontSize="4.4" fontFamily="monospace" fontWeight="900">
+                      [➔] ORD-8842 LHR
+                    </text>
+                    <text x="-26" y="-4" fill="#b91c1c" fontSize="3.8" fontFamily="monospace" fontWeight="bold">
+                      COD RS. 4,500
+                    </text>
+
+                    <line x1="-38" y1="2" x2="38" y2="2" stroke="#e2e8f0" strokeWidth="0.5" />
+                    <text x="-36" y="11" fill="#64748b" fontSize="4.4" fontFamily="monospace">
+                      [ ] ORD-8843 KHI
+                    </text>
+
+                    <line x1="-38" y1="17" x2="38" y2="17" stroke="#e2e8f0" strokeWidth="0.5" />
+                    <text x="-36" y="26" fill="#94a3b8" fontSize="4.4" fontFamily="monospace">
+                      [ ] ORD-8844 MUX
                     </text>
                   </g>
+
                   {/* Tariq's Signature Pen Resting on Register */}
                   <line x1="-30" y1="45" x2="30" y2="15" stroke="#0284c7" strokeWidth="2.8" strokeLinecap="round" />
                   <line x1="25" y1="17.5" x2="33" y2="13.5" stroke="url(#penChromeGrad)" strokeWidth="2.2" strokeLinecap="round" />
@@ -995,33 +1191,21 @@ export const Scene1Packing: React.FC = () => {
 
                 {/* 3. Right-Side Tooling Zone: Barcode Scanner in Dock */}
                 <g transform="translate(910, 840)">
-                  <ellipse cx="10" cy="52" rx="24" ry="9" fill="#000000" opacity="0.45" filter="url(#shadowBlur)" />
+                  <ellipse cx="10" cy="52" rx="30" ry="11" fill="url(#softShadowRadial)" opacity="0.8" />
                   <ellipse cx="20" cy="44" rx="22" ry="7" fill="#1e293b" stroke="#334155" strokeWidth="1" />
                   <g transform="translate(18, 10) rotate(-22)">
                     <rect x="-10" y="-24" width="20" height="34" rx="3" fill="#eab308" stroke="#ca8a04" strokeWidth="0.8" />
                     <rect x="-7" y="10" width="14" height="30" rx="2" fill="#1f2937" />
-                    <circle cx="-12" cy="38" r="2" fill="#ef4444" filter="drop-shadow(0 0 3px #ef4444)" />
+                    <circle cx="-12" cy="38" r="2" fill="#ef4444" />
                   </g>
                 </g>
 
                 {/* 4. Industrial Heavy-Duty Packing Tape Dispenser Gun (Right Side) */}
-                <g transform="translate(815, 940) rotate(-12)">
-                  <ellipse cx="15" cy="45" rx="28" ry="10" fill="#000000" opacity="0.5" filter="url(#shadowBlur)" />
-                  {/* Pistol Grip Handle */}
-                  <rect x="0" y="20" width="14" height="30" rx="3" fill="#1e293b" stroke="#0f172a" strokeWidth="1" />
-                  {/* Tape Gun Metal Housing */}
-                  <path d="M -5 20 L 35 10 L 40 28 L 5 32 Z" fill="url(#tapeGunGrad)" />
-                  {/* Brown Packing Tape Spool Core */}
-                  <circle cx="8" cy="8" r="22" fill="#b45309" stroke="#78350f" strokeWidth="1.2" />
-                  <circle cx="8" cy="8" r="16" fill="#ca8a04" />
-                  <circle cx="8" cy="8" r="9" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1" />
-                  {/* Serrated Cutting Blade at Front */}
-                  <line x1="36" y1="12" x2="38" y2="26" stroke="url(#penChromeGrad)" strokeWidth="2" strokeLinecap="round" />
-                </g>
+                <TapeDispenserGun variant="table" transform="translate(815, 940) rotate(-12)" />
 
                 {/* 5. Rubber Stamp Pad Tin (Front-Right Tooling) */}
                 <g transform="translate(805, 1020)">
-                  <ellipse cx="15" cy="18" rx="22" ry="7" fill="#000000" opacity="0.4" filter="url(#shadowBlur)" />
+                  <ellipse cx="15" cy="18" rx="28" ry="9" fill="url(#softShadowRadial)" opacity="0.75" />
                   <rect width="32" height="22" rx="3" fill="#334155" stroke="#1e293b" strokeWidth="1" />
                   <rect x="3" y="3" width="26" height="16" rx="1.5" fill="#09090b" />
                   <rect x="5" y="5" width="22" height="12" rx="1" fill="#18181b" />
@@ -1031,13 +1215,12 @@ export const Scene1Packing: React.FC = () => {
                 <polygon
                   points="360,1060 220,1105 240,935 360,890"
                   fill="url(#boxSunCastShadow)"
-                  filter="url(#shadowBlur)"
                 />
 
                 {/* STAINLESS STEEL SCALE UNDER PARCEL (MATHEMATICALLY ENCLOSES REDUCED PARCEL) */}
                 <g id="mobile-scale-assembly">
                   {/* Ambient Occlusion Shadow Under Scale Chassis */}
-                  <ellipse cx="560" cy="1102" rx="320" ry="20" fill="#020617" opacity="0.68" filter="url(#shadowBlur)" />
+                  <ellipse cx="560" cy="1102" rx="340" ry="24" fill="url(#softShadowRadial)" opacity="0.95" />
 
                   {/* Stainless Steel Heavy Platter Top Surface */}
                   <polygon
@@ -1061,7 +1244,6 @@ export const Scene1Packing: React.FC = () => {
                     points="360,1060 720,1060 780,1027 420,1027"
                     fill="#020617"
                     opacity="0.45"
-                    filter="url(#contactShadowBlur)"
                   />
 
                   {/* Digital Weight Readout on Scale Front Apron */}
@@ -1099,7 +1281,7 @@ export const Scene1Packing: React.FC = () => {
                 <line x1="360" y1="890" x2="420" y2="857" stroke="#fef08a" strokeWidth="1.2" opacity="0.35" />
 
                 {/* Contact Shadow Under Box on Scale Platter */}
-                <polygon points="355,1060 725,1060 785,1027 775,1022 360,1056" fill="#020617" opacity="0.6" filter="url(#contactShadowBlur)" />
+                <polygon points="355,1060 725,1060 785,1027 775,1022 360,1056" fill="#020617" opacity="0.6" />
 
                 {/* 4. Heavy Copper Staples along Left Seam */}
                 {[915, 965, 1015].map((stapleY, idx) => (
@@ -1166,7 +1348,8 @@ export const Scene1Packing: React.FC = () => {
                   <g onPointerDown={handlePointerDown} className="cursor-pointer select-none" style={{ touchAction: 'none' }}>
                     <rect x="360" y="830" width="410" height="85" fill="transparent" className="cursor-grab active:cursor-grabbing" />
                     <line
-                      x1={Math.max(390, 390 + tapeWidth)}
+                      ref={guideLineRef}
+                      x1="390"
                       y1="873.5"
                       x2="750"
                       y2="873.5"
@@ -1177,37 +1360,36 @@ export const Scene1Packing: React.FC = () => {
                       opacity="0.9"
                     />
                     <circle cx="750" cy="873.5" r="4.5" fill="#f59e0b" stroke="#78350f" strokeWidth="1.8" />
-                    {sealProgress < 0.65 && (
-                      <g transform="translate(570, 845)" className="pointer-events-none transition-opacity duration-200" style={{ opacity: Math.max(0, 1 - sealProgress * 1.6) }}>
-                        <rect x="-105" y="-14" width="210" height="22" rx="11" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.8))" />
-                        <text x="0" y="1" fill="#fef08a" fontSize="9.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
-                          SLIDE TAPE TO SEAL BOX ➔
-                        </text>
-                      </g>
-                    )}
+                    <g ref={slidePromptGroupRef} transform="translate(570, 845)" className="pointer-events-none">
+                      <rect x="-103" y="-11" width="210" height="22" rx="11" fill="#000000" fillOpacity="0.45" />
+                      <rect x="-105" y="-14" width="210" height="22" rx="11" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" />
+                      <text x="0" y="1" fill="#fef08a" fontSize="9.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
+                        SLIDE TAPE TO SEAL BOX ➔
+                      </text>
+                    </g>
                   </g>
                 )}
 
                 {/* Applied Tape (Brown Translucent + Fiberglass Reinforcement Grid) */}
-                {tapeWidth > 0 && (
-                  <g>
-                    <polygon
-                      points={`390,873.5 ${390 + tapeWidth},873.5 ${390 + tapeWidth + 5},869 395,869`}
-                      fill="url(#tapeStripGrad)"
-                      opacity="0.95"
-                      filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
-                    />
-                    <polygon
-                      points={`390,873.5 ${390 + tapeWidth},873.5 ${390 + tapeWidth + 5},869 395,869`}
-                      fill="url(#tapeFiber)"
-                      opacity="0.45"
-                    />
-                  </g>
-                )}
+                <g ref={appliedTapeGroupRef} style={{ display: 'none' }}>
+                  <polygon
+                    ref={tapePoly1Ref}
+                    points="390,873.5 390,873.5 395,869 395,869"
+                    fill="url(#tapeStripGrad)"
+                    opacity="0.95"
+                  />
+                  <polygon
+                    ref={tapePoly2Ref}
+                    points="390,873.5 390,873.5 395,869 395,869"
+                    fill="url(#tapeFiber)"
+                    opacity="0.45"
+                  />
+                </g>
 
                 {/* Shipping Label on Front (Crisply Sized 180x110) */}
                 <g transform="translate(375, 910)">
-                  <rect width="180" height="110" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" filter="drop-shadow(0 2px 5px rgba(0,0,0,0.35))" />
+                  <rect x="2" y="3" width="180" height="110" rx="3.5" fill="#000000" fillOpacity="0.3" />
+                  <rect width="180" height="110" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" />
                   <rect x="0" y="0" width="180" height="22" fill="#0f172a" rx="2.5" />
                   <text x="10" y="15" fill="#f59e0b" fontSize="9.5" fontFamily="monospace" fontWeight="bold">
                     LEOPARDS COD EXPRESS
@@ -1276,39 +1458,31 @@ export const Scene1Packing: React.FC = () => {
                   </g>
                 )}
 
-                {/* Draggable Red Tape Gun */}
-                <g
-                  transform={`translate(${390 + tapeWidth}, 850)`}
+                {/* Draggable Industrial Packing Tape Gun */}
+                <TapeDispenserGun
+                  ref={tapeGunGroupRef}
+                  variant="box"
+                  transform="translate(390, 850)"
                   onPointerDown={handlePointerDown}
-                  className="cursor-grab active:cursor-grabbing transition-transform duration-75 select-none"
+                  className="cursor-grab active:cursor-grabbing select-none"
                   style={{ touchAction: 'none' }}
-                >
-                  <path d="M-5 -25 L25 -25 L32 0 L-2 10 Z" fill="#dc2626" stroke="#991b1b" strokeWidth="2.5" filter="drop-shadow(0 3px 6px rgba(0,0,0,0.6))" />
-                  <circle cx="12" cy="-12" r="14" fill="#f59e0b" stroke="#b45309" strokeWidth="2" />
-                  <circle cx="12" cy="-12" r="5" fill="#1e293b" />
-                  <rect x="-10" y="5" width="12" height="26" rx="3" fill="#0f172a" />
-                  <rect x="22" y="2" width="8" height="6" fill="#475569" />
-                </g>
+                />
 
                 {/* Typewriter Speech Bubble Above Tariq */}
-                {displayedDialogue.length > 0 && (
-                  <g transform="translate(320, 390)">
-                    <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                    <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" filter="drop-shadow(0 10px 24px rgba(0,0,0,0.8))" />
-                    <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
-                    <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
-                      TARIQ (PACKER)
-                    </text>
-                    <text x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                      "{displayedDialogue.slice(0, 36)}
-                    </text>
-                    <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                      {displayedDialogue.slice(36)}
-                      {!isTypingComplete && <tspan fill="#f59e0b" className="animate-pulse">|</tspan>}
-                      {isTypingComplete && '"'}
-                    </text>
-                  </g>
-                )}
+                <g ref={speechBubbleGroupRef} transform="translate(320, 390)" style={{ display: 'none' }}>
+                  <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
+                  <rect x="0" y="6" width="440" height="88" rx="16" fill="#000000" fillOpacity="0.5" />
+                  <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
+                  <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
+                  <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
+                    TARIQ (PACKER)
+                  </text>
+                  <text ref={speechLine1Ref} x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600" />
+                  <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
+                    <tspan ref={speechLine2TextRef} />
+                    <tspan ref={speechCursorRef} fill="#f59e0b" className="animate-pulse">|</tspan>
+                  </text>
+                </g>
               </g>
             ) : (
               /* =====================================================================
@@ -1367,13 +1541,15 @@ export const Scene1Packing: React.FC = () => {
                   <path d="M340 135 L380 135 L390 150 L330 150 Z" fill="#1e293b" stroke="#64748b" strokeWidth="1" />
                   <polygon points="340,150 380,150 520,680 200,680" fill="url(#sunBeamBroad)" opacity="0.35" />
 
-                  {/* Center Lamp directly over Tariq's bench with authentic industrial micro-flicker */}
+                  {/* Center Lamp directly over Tariq's bench (Solid Lamp Fixture) */}
+                  <line x1="960" y1="72" x2="960" y2="125" stroke="#475569" strokeWidth="2.5" />
+                  <path d="M935 125 L985 125 L995 142 L925 142 Z" fill="#1e293b" stroke="#64748b" strokeWidth="1.2" />
+                  {/* ONLY the glowing bulb light flickers */}
                   <g className="animate-lamp-flicker">
-                    <line x1="960" y1="72" x2="960" y2="125" stroke="#475569" strokeWidth="2.5" />
-                    <path d="M935 125 L985 125 L995 142 L925 142 Z" fill="#1e293b" stroke="#64748b" strokeWidth="1.2" />
-                    <ellipse cx="960" cy="142" rx="18" ry="4" fill="#fef08a" filter="drop-shadow(0 0 12px #fbbf24)" />
+                    <ellipse cx="960" cy="142" rx="25" ry="7" fill="#fbbf24" opacity="0.35" />
+                    <ellipse cx="960" cy="142" rx="18" ry="4" fill="#fef08a" />
                   </g>
-                  {/* Synchronized Flickering Downward Cone */}
+                  {/* Synchronized Flickering Downward Light Cone */}
                   <polygon
                     points="935,142 985,142 1280,720 640,720"
                     fill="url(#pendantCone)"
@@ -1533,7 +1709,7 @@ export const Scene1Packing: React.FC = () => {
 
                     {/* Van 1 */}
                     <g transform="translate(30, 230)">
-                      <rect width="180" height="95" rx="6" fill="#f8fafc" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.3))" />
+                      <rect width="180" height="95" rx="6" fill="#f8fafc" />
                       <path d="M140 0 L180 35 L180 95 L140 95 Z" fill="#e2e8f0" />
                       <polygon points="144,8 172,35 144,35" fill="#0284c7" opacity="0.8" />
                       <rect x="0" y="52" width="180" height="12" fill="#15803d" />
@@ -1561,15 +1737,15 @@ export const Scene1Packing: React.FC = () => {
 
                   {/* REALISTIC MULTI-LAYER VOLUMETRIC SUNBEAMS */}
                   {/* Broad Ambient Sun Cone */}
-                  <polygon points="1370,240 1850,240 1350,1080 500,1080" fill="url(#sunBeamBroad)" filter="url(#sunGlowFilter)" opacity="0.85" />
+                  <polygon points="1370,240 1850,240 1350,1080 500,1080" fill="url(#sunBeamBroad)" opacity="0.85" />
                   {/* Intense Golden Core Shaft 1 - Aimed directly across the workbench */}
-                  <polygon points="1420,240 1620,240 1080,1080 820,1080" fill="url(#sunBeamCore)" filter="url(#sunShaftFilter)" opacity="0.95" />
+                  <polygon points="1420,240 1620,240 1080,1080 820,1080" fill="url(#sunBeamCore)" opacity="0.95" />
                   {/* Collimated Core Shaft 2 */}
-                  <polygon points="1660,240 1820,240 1480,1080 1260,1080" fill="url(#sunBeamCore)" filter="url(#sunShaftFilter)" opacity="0.75" />
+                  <polygon points="1660,240 1820,240 1480,1080 1260,1080" fill="url(#sunBeamCore)" opacity="0.75" />
 
                   {/* Slanted Shadow Mullion Bars across Sunbeams */}
-                  <polygon points="1450,240 1475,240 910,1080 885,1080" fill="#080c14" opacity="0.4" filter="url(#shadowBlur)" />
-                  <polygon points="1620,240 1648,240 1220,1080 1192,1080" fill="#080c14" opacity="0.35" filter="url(#shadowBlur)" />
+                  <polygon points="1450,240 1475,240 910,1080 885,1080" fill="#080c14" opacity="0.4" />
+                  <polygon points="1620,240 1648,240 1220,1080 1192,1080" fill="#080c14" opacity="0.35" />
 
                   {/* Sunlit Dust Motes Catching Specular Glow */}
                   <g>
@@ -1592,7 +1768,6 @@ export const Scene1Packing: React.FC = () => {
                         r={mote.r}
                         fill="#fef08a"
                         className={mote.cls}
-                        filter="drop-shadow(0 0 5px #fbbf24)"
                       />
                     ))}
                   </g>
@@ -1620,15 +1795,17 @@ export const Scene1Packing: React.FC = () => {
 
                   {/* Tariq's Eyes Group with Realistic Periodic Blink and Cursor Tracking */}
                   <g className="animate-eye-blink" style={{ transformOrigin: '0px 76px' }}>
-                    {/* Left Eye White & Tracking Pupil */}
                     <ellipse cx="-13" cy="76" rx="4.5" ry="2.4" fill="#ffffff" />
-                    <circle cx={-13 + pupilOffset.x} cy={76 + pupilOffset.y} r="2.0" fill="#111827" />
-                    <circle cx={-13 + pupilOffset.x - 0.6} cy={76 + pupilOffset.y - 0.5} r="0.5" fill="#ffffff" />
-
-                    {/* Right Eye White & Tracking Pupil */}
                     <ellipse cx="13" cy="76" rx="4.5" ry="2.4" fill="#ffffff" />
-                    <circle cx={13 + pupilOffset.x} cy={76 + pupilOffset.y} r="2.0" fill="#111827" />
-                    <circle cx={13 + pupilOffset.x - 0.6} cy={76 + pupilOffset.y - 0.5} r="0.5" fill="#ffffff" />
+                    <g ref={pupilsGroupRef}>
+                      {/* Left Tracking Pupil */}
+                      <circle cx="-13" cy="76" r="2.0" fill="#111827" />
+                      <circle cx="-13.6" cy="75.5" r="0.5" fill="#ffffff" />
+
+                      {/* Right Tracking Pupil */}
+                      <circle cx="13" cy="76" r="2.0" fill="#111827" />
+                      <circle cx="12.4" cy="75.5" r="0.5" fill="#ffffff" />
+                    </g>
                   </g>
 
                   {/* Facial Features */}
@@ -1679,7 +1856,7 @@ export const Scene1Packing: React.FC = () => {
 
                     {/* Tariq's Staff ID Card Badge (Hanging Symmetrically from Clasp) */}
                     <g transform="translate(0, 187)">
-                      <rect x="-18" y="0" width="36" height="48" rx="3" fill="#ffffff" stroke="#94a3b8" strokeWidth="1" filter="drop-shadow(0 3px 6px rgba(0,0,0,0.45))" />
+                      <rect x="-18" y="0" width="36" height="48" rx="3" fill="#ffffff" stroke="#94a3b8" strokeWidth="1" />
                       {/* Lanyard Punch Slot */}
                       <rect x="-5.5" y="3" width="11" height="2.5" rx="1.2" fill="#475569" />
                       {/* Top Header Banner */}
@@ -1795,7 +1972,7 @@ export const Scene1Packing: React.FC = () => {
                 {/* PROPS ON WORKBENCH (HARMONIOUS INDUSTRIAL ARRANGEMENT) */}
                 {/* 1. Steaming Chai Glass & Saucer (Upper-Left Corner, Clear of All Papers) */}
                 <g transform="translate(520, 710)">
-                  <ellipse cx="6" cy="62" rx="26" ry="9" fill="#000000" opacity="0.5" filter="url(#shadowBlur)" />
+                  <ellipse cx="6" cy="62" rx="32" ry="12" fill="url(#softShadowRadial)" opacity="0.85" />
                   {/* Stainless Steel Saucer */}
                   <ellipse cx="14" cy="54" rx="26" ry="7" fill="#94a3b8" stroke="#cbd5e1" strokeWidth="1" />
                   <ellipse cx="14" cy="52" rx="21" ry="5.5" fill="#cbd5e1" />
@@ -1806,39 +1983,31 @@ export const Scene1Packing: React.FC = () => {
                   {/* Rim Sun Specular Highlight */}
                   <ellipse cx="14" cy="15" rx="11" ry="2" fill="#ffffff" opacity="0.65" />
 
-                  {/* Natural Billowing Hot Tea Steam Wisps */}
-                  <g filter="url(#naturalSteamBlur)" style={{ transformOrigin: '14px 10px' }}>
-                    <path
-                      d="M 14 12 Q 9 0 17 -16 T 11 -42 T 18 -68"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="5.5"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-1"
-                    />
-                    <path
-                      d="M 10 14 Q 4 3 13 -12 T 6 -36 T 14 -58"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="4.5"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-2"
-                    />
-                    <path
-                      d="M 18 14 Q 24 5 16 -8 T 22 -30 T 15 -52"
-                      stroke="url(#teaVaporGrad)"
-                      strokeWidth="4.0"
-                      fill="none"
-                      strokeLinecap="round"
-                      className="animate-steam-natural-3"
-                    />
-                  </g>
+                  {/* Glowing Hot Tea Surface Base */}
+                  <ellipse cx="14" cy="15" rx="8" ry="2.2" fill="#fef3c7" opacity="0.32" />
+
+                  {/* Continuous Delicate Karak Tea Steam */}
+                  <foreignObject
+                    x="-3"
+                    y="-110"
+                    width="34"
+                    height="125"
+                    className="pointer-events-none"
+                    style={{ overflow: 'visible' }}
+                  >
+                    <div className="tea-smoke-container">
+                      <span /><span /><span /><span />
+                      <span /><span /><span /><span />
+                      <span /><span /><span /><span />
+                    </div>
+                  </foreignObject>
                 </g>
 
                 {/* 2. DAILY DISPATCH REGISTER (SECURELY ON TABLE, CENTERED AT x=640, y=835) */}
                 <g transform="translate(640, 835) rotate(168)">
-                  {/* Heavy Kraft Hardbound Clipboard Base with Drop Shadow */}
-                  <rect x="-60" y="-85" width="120" height="170" rx="4" fill="#78350f" stroke="#451a03" strokeWidth="1.8" filter="drop-shadow(0 6px 14px rgba(0,0,0,0.55))" />
+                  {/* Heavy Kraft Hardbound Clipboard Base */}
+                  <rect x="-62" y="-81" width="124" height="172" rx="4" fill="#000000" opacity="0.35" />
+                  <rect x="-60" y="-85" width="120" height="170" rx="4" fill="#78350f" stroke="#451a03" strokeWidth="1.8" />
                   {/* Brass Corner Protectors */}
                   <polygon points="-60,-85 -48,-85 -60,-73" fill="#d97706" />
                   <polygon points="60,-85 48,-85 60,-73" fill="#d97706" />
@@ -1852,72 +2021,76 @@ export const Scene1Packing: React.FC = () => {
                   {/* Lined Dispatch Ledger Sheet */}
                   <rect x="-53" y="-72" width="106" height="146" rx="2" fill="#fdfbf7" />
 
-                  {/* Register Header facing Tariq */}
-                  <text x="-48" y="-58" fill="#0f172a" fontSize="7.2" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.4">
-                    DAILY DISPATCH REGISTER
-                  </text>
-                  <text x="-48" y="-49" fill="#475569" fontSize="5.5" fontFamily="monospace">
-                    BATCH #PK-409 • 07:30 PKT
-                  </text>
-                  <line x1="-48" y1="-45" x2="48" y2="-45" stroke="#cbd5e1" strokeWidth="0.8" />
+                  {/* Strictly Clipped Ledger Content to Guarantee Zero Margin Overflow */}
+                  <g clipPath="url(#desktopRegisterSheetClip)">
+                    {/* Register Header facing Tariq */}
+                    <text x="-46" y="-56" fill="#0f172a" fontSize="6.2" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.2">
+                      DAILY DISPATCH REGISTER
+                    </text>
+                    <text x="-46" y="-48" fill="#64748b" fontSize="4.6" fontFamily="monospace">
+                      BATCH #PK-409 • 07:30 PKT
+                    </text>
+                    <line x1="-46" y1="-44" x2="46" y2="-44" stroke="#cbd5e1" strokeWidth="0.8" />
 
-                  {/* Logged Rows Facing Worker */}
-                  <g transform="translate(-48, -34)">
-                    <text x="0" y="0" fill="#10b981" fontSize="6.4" fontFamily="monospace" fontWeight="bold">
-                      [✓] ORD-8841 (ISB) RS.3,200
+                    {/* Logged Rows Facing Worker (Cleanly Within Margins) */}
+                    <text x="-44" y="-32" fill="#059669" fontSize="5.0" fontFamily="monospace" fontWeight="bold">
+                      [✓] ORD-8841 ISB 3.2k
                     </text>
+                    <line x1="-46" y1="-26" x2="46" y2="-26" stroke="#f1f5f9" strokeWidth="0.6" />
+
                     {/* Active Order Highlight Row */}
-                    <rect x="-2" y="5" width="98" height="13" fill="#fef08a" rx="1.5" />
-                    <text x="0" y="15" fill="#991b1b" fontSize="6.4" fontFamily="monospace" fontWeight="900">
-                      [➔] ORD-8842 (LHR) COD RS.4,500
+                    <rect x="-46" y="-22" width="92" height="18" fill="#fef08a" stroke="#ca8a04" strokeWidth="0.6" rx="1.5" />
+                    <text x="-44" y="-12" fill="#991b1b" fontSize="5.0" fontFamily="monospace" fontWeight="900">
+                      [➔] ORD-8842 LHR COD
                     </text>
-                    <text x="0" y="30" fill="#64748b" fontSize="6.4" fontFamily="monospace">
-                      [ ] ORD-8843 (KHI) RS.2,100
+                    <text x="-32" y="-5" fill="#b91c1c" fontSize="4.4" fontFamily="monospace" fontWeight="bold">
+                      RS. 4,500 (URGENT)
                     </text>
-                    <text x="0" y="44" fill="#94a3b8" fontSize="6.4" fontFamily="monospace">
-                      [ ] ORD-8844 (MUX) RS.1,800
+
+                    <line x1="-46" y1="0" x2="46" y2="0" stroke="#f1f5f9" strokeWidth="0.6" />
+                    <text x="-44" y="11" fill="#64748b" fontSize="5.0" fontFamily="monospace">
+                      [ ] ORD-8843 KHI 2.1k
                     </text>
+
+                    <line x1="-46" y1="18" x2="46" y2="18" stroke="#f1f5f9" strokeWidth="0.6" />
+                    <text x="-44" y="29" fill="#94a3b8" fontSize="5.0" fontFamily="monospace">
+                      [ ] ORD-8844 MUX 1.8k
+                    </text>
+
+                    {/* Tariq's Signature Line */}
+                    <text x="-44" y="44" fill="#94a3b8" fontSize="4.0" fontFamily="monospace">
+                      VERIFIED BY PACKER:
+                    </text>
+                    <path d="M-42 52 Q -30 45 -22 51 Q -15 56 -5 49 Q 5 44 15 50" fill="none" stroke="#0284c7" strokeWidth="1" opacity="0.8" />
                   </g>
 
                   {/* Tariq's Signature Pen Resting on Register */}
-                  <line x1="-35" y1="55" x2="35" y2="20" stroke="#0284c7" strokeWidth="3" strokeLinecap="round" />
-                  <line x1="30" y1="23" x2="38" y2="18" stroke="url(#penChromeGrad)" strokeWidth="2.5" strokeLinecap="round" />
-                  <circle cx="-32" cy="53" r="2" fill="#1e293b" />
+                  <line x1="-30" y1="58" x2="32" y2="28" stroke="#0284c7" strokeWidth="3" strokeLinecap="round" />
+                  <line x1="28" y1="30" x2="35" y2="26" stroke="url(#penChromeGrad)" strokeWidth="2.5" strokeLinecap="round" />
+                  <circle cx="-28" cy="56" r="2" fill="#1e293b" />
                 </g>
 
-                {/* 3. Barcode Scanner in Angled Charging Stand (Far Right Tooling, In Sunbeam) */}
-                <g transform="translate(1360, 745)">
-                  <ellipse cx="14" cy="52" rx="28" ry="10" fill="#000000" opacity="0.45" filter="url(#shadowBlur)" />
+                {/* 3. Industrial Packing Tape Gun (Moved UP onto Table, Clear of Scale Platter) */}
+                <TapeDispenserGun variant="table" transform="translate(1285, 735) rotate(-15)" />
+
+                {/* 4. Barcode Scanner in Angled Charging Stand (Far Right Tooling, In Sunbeam) */}
+                <g transform="translate(1390, 735)">
+                  <ellipse cx="14" cy="52" rx="34" ry="12" fill="url(#softShadowRadial)" opacity="0.8" />
                   <ellipse cx="20" cy="44" rx="24" ry="8" fill="#1e293b" stroke="#334155" strokeWidth="1.2" />
                   <path d="M12 44 L16 16 L28 16 L30 44 Z" fill="#334155" />
                   <g transform="translate(22, 12) rotate(-20)">
                     <rect x="-10" y="-26" width="22" height="38" rx="3.5" fill="#eab308" stroke="#854d0e" strokeWidth="1" />
                     <rect x="-8" y="-24" width="18" height="10" fill="#111827" rx="1.5" />
                     <rect x="-6" y="8" width="14" height="34" rx="2.5" fill="#1f2937" />
-                    <circle cx="-12" cy="40" r="2.2" fill="#ef4444" filter="drop-shadow(0 0 4px #ef4444)" />
+                    <circle cx="-12" cy="40" r="2.2" fill="#ef4444" />
                   </g>
                   <circle cx="28" cy="45" r="1.5" fill="#22c55e" />
                   <path d="M22 44 Q 16 54 24 62 Q 32 70 24 78 Q 16 86 26 94" stroke="#0f172a" strokeWidth="2.2" fill="none" strokeLinecap="round" />
                 </g>
 
-                {/* 4. Industrial Packing Tape Gun (Resting on Table to Right of Box) */}
-                <g transform="translate(1300, 835) rotate(-16)">
-                  <ellipse cx="20" cy="48" rx="34" ry="11" fill="#000000" opacity="0.5" filter="url(#shadowBlur)" />
-                  {/* Heavy Pistol Grip Handle */}
-                  <rect x="0" y="22" width="16" height="36" rx="3.5" fill="#1e293b" stroke="#0f172a" strokeWidth="1.2" />
-                  {/* Tape Spool Metal Housing Frame */}
-                  <path d="M -8 22 L 42 12 L 48 32 L 6 38 Z" fill="url(#tapeGunGrad)" />
-                  {/* Heavy Brown Tape Roll */}
-                  <circle cx="10" cy="10" r="26" fill="#b45309" stroke="#78350f" strokeWidth="1.4" />
-                  <circle cx="10" cy="10" r="18" fill="#ca8a04" />
-                  <circle cx="10" cy="10" r="10" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.2" />
-                  {/* Serrated Steel Blade */}
-                  <line x1="42" y1="14" x2="44" y2="30" stroke="url(#penChromeGrad)" strokeWidth="2.4" strokeLinecap="round" />
-                </g>
-
                 {/* 5. Vintage Stamp Pad Tin & Turned Wooden Stamp (Far Right) */}
-                <g transform="translate(1380, 855)">
-                  <ellipse cx="18" cy="20" rx="26" ry="8" fill="#000000" opacity="0.4" filter="url(#shadowBlur)" />
+                <g transform="translate(1385, 840)">
+                  <ellipse cx="18" cy="20" rx="32" ry="10" fill="url(#softShadowRadial)" opacity="0.75" />
                   <rect width="36" height="26" rx="3" fill="#334155" stroke="#1e293b" strokeWidth="1.2" />
                   <rect x="3.5" y="3.5" width="29" height="19" rx="1.8" fill="#09090b" />
                   <rect x="5.5" y="5.5" width="25" height="15" rx="1.2" fill="#18181b" />
@@ -1929,9 +2102,9 @@ export const Scene1Packing: React.FC = () => {
                   </g>
                 </g>
 
-                {/* 6. Heavy-Duty Snap-Off Box Cutter Utility Knife (Right of Scale) */}
-                <g transform="translate(1245, 915) rotate(22)">
-                  <ellipse cx="18" cy="10" rx="22" ry="5" fill="#000000" opacity="0.35" filter="url(#shadowBlur)" />
+                {/* 6. Heavy-Duty Snap-Off Box Cutter Utility Knife (Clear of Scale Platter) */}
+                <g transform="translate(1335, 915) rotate(18)">
+                  <ellipse cx="18" cy="10" rx="26" ry="7" fill="url(#softShadowRadial)" opacity="0.7" />
                   {/* Yellow Ergonomic Plastic Casing */}
                   <rect width="38" height="10" rx="2.5" fill="#eab308" stroke="#ca8a04" strokeWidth="0.8" />
                   {/* Black Rubber Grip Inset */}
@@ -1946,13 +2119,12 @@ export const Scene1Packing: React.FC = () => {
                 <polygon
                   points="770,895 620,950 645,760 770,715"
                   fill="url(#boxSunCastShadow)"
-                  filter="url(#shadowBlur)"
                 />
 
                 {/* STAINLESS STEEL SCALE UNDER PARCEL (MATHEMATICALLY ENCLOSES REDUCED PARCEL) */}
                 <g id="desktop-scale-assembly">
                   {/* Ambient Occlusion Shadow Under Scale */}
-                  <ellipse cx="1000" cy="946" rx="320" ry="20" fill="#020617" opacity="0.68" filter="url(#shadowBlur)" />
+                  <ellipse cx="1000" cy="946" rx="340" ry="24" fill="url(#softShadowRadial)" opacity="0.95" />
 
                   {/* Stainless Steel Heavy Platter Top Surface */}
                   <polygon
@@ -1980,7 +2152,6 @@ export const Scene1Packing: React.FC = () => {
                     points="770,895 1150,895 1216,859 836,859"
                     fill="#020617"
                     opacity="0.45"
-                    filter="url(#contactShadowBlur)"
                   />
 
                   {/* Digital Weight Readout on Scale Front Apron */}
@@ -2013,12 +2184,12 @@ export const Scene1Packing: React.FC = () => {
                 <line x1="770" y1="715" x2="1150" y2="715" stroke="#fef08a" strokeWidth="1.4" opacity="0.45" />
                 <line x1="1150" y1="715" x2="1150" y2="895" stroke="#251205" strokeWidth="2.5" opacity="0.75" />
                 <line x1="770" y1="715" x2="770" y2="895" stroke="#3b1f0b" strokeWidth="2" opacity="0.6" />
-                <line x1="1150" y1="715" x2="1216,679" stroke="#fef08a" strokeWidth="2.5" opacity="0.75" />
+                <line x1="1150" y1="715" x2="1216" y2="679" stroke="#fef08a" strokeWidth="2.5" opacity="0.75" />
                 <line x1="1216" y1="679" x2="1216" y2="859" stroke="#fef08a" strokeWidth="2" opacity="0.65" />
                 <line x1="770" y1="715" x2="836" y2="679" stroke="#fef08a" strokeWidth="1.2" opacity="0.35" />
 
                 {/* Crisp Contact Shadow Under Box on Scale */}
-                <polygon points="765,895 1155,895 1221,859 1211,854 770,890" fill="#020617" opacity="0.65" filter="url(#contactShadowBlur)" />
+                <polygon points="765,895 1155,895 1221,859 1211,854 770,890" fill="#020617" opacity="0.65" />
 
                 {/* 4. Manufacturer Joint Heavy Copper Staples along Left Seam */}
                 {[740, 795, 850].map((stapleY, idx) => (
@@ -2085,7 +2256,8 @@ export const Scene1Packing: React.FC = () => {
                   <g onPointerDown={handlePointerDown} className="cursor-pointer select-none" style={{ touchAction: 'none' }}>
                     <rect x="770" y="650" width="450" height="90" fill="transparent" className="cursor-grab active:cursor-grabbing" />
                     <line
-                      x1={Math.max(803, 803 + tapeWidth)}
+                      ref={guideLineRef}
+                      x1="803"
                       y1="697"
                       x2="1183"
                       y2="697"
@@ -2096,37 +2268,34 @@ export const Scene1Packing: React.FC = () => {
                       opacity="0.9"
                     />
                     <circle cx="1183" cy="697" r="5" fill="#f59e0b" stroke="#78350f" strokeWidth="2" />
-                    {sealProgress < 0.65 && (
-                      <g transform="translate(993, 669)" className="pointer-events-none transition-opacity duration-200" style={{ opacity: Math.max(0, 1 - sealProgress * 1.6) }}>
-                        <rect x="-115" y="-15" width="230" height="24" rx="12" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.8))" />
-                        <text x="0" y="1" fill="#fef08a" fontSize="10.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
-                          SLIDE TAPE TO SEAL BOX ➔
-                        </text>
-                      </g>
-                    )}
+                    <g ref={slidePromptGroupRef} transform="translate(993, 669)" className="pointer-events-none">
+                      <rect x="-115" y="-15" width="230" height="24" rx="12" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" />
+                      <text x="0" y="1" fill="#fef08a" fontSize="10.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
+                        SLIDE TAPE TO SEAL BOX ➔
+                      </text>
+                    </g>
                   </g>
                 )}
 
                 {/* Applied Tape (Brown Translucent + Fiberglass Reinforcement Grid) */}
-                {tapeWidth > 0 && (
-                  <g>
-                    <polygon
-                      points={`803,697 ${803 + tapeWidth},697 ${803 + tapeWidth + 6},692 809,692`}
-                      fill="url(#tapeStripGrad)"
-                      opacity="0.95"
-                      filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
-                    />
-                    <polygon
-                      points={`803,697 ${803 + tapeWidth},697 ${803 + tapeWidth + 6},692 809,692`}
-                      fill="url(#tapeFiber)"
-                      opacity="0.45"
-                    />
-                  </g>
-                )}
+                <g ref={appliedTapeGroupRef} style={{ display: 'none' }}>
+                  <polygon
+                    ref={tapePoly1Ref}
+                    points="803,697 803,697 809,692 809,692"
+                    fill="url(#tapeStripGrad)"
+                    opacity="0.95"
+                  />
+                  <polygon
+                    ref={tapePoly2Ref}
+                    points="803,697 803,697 809,692 809,692"
+                    fill="url(#tapeFiber)"
+                    opacity="0.45"
+                  />
+                </g>
 
                 {/* Front Shipping Label (Crisply Sized 185x115) */}
                 <g transform="translate(785, 735)">
-                  <rect width="185" height="115" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" filter="drop-shadow(0 2px 5px rgba(0,0,0,0.35))" />
+                  <rect width="185" height="115" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" />
                   <rect x="0" y="0" width="185" height="23" fill="#0f172a" rx="2.5" />
                   <text x="10" y="16" fill="#f59e0b" fontSize="10" fontFamily="monospace" fontWeight="bold">
                     LEOPARDS COD EXPRESS
@@ -2195,132 +2364,185 @@ export const Scene1Packing: React.FC = () => {
                   </g>
                 )}
 
-                {/* Draggable Red Tape Gun */}
-                <g
-                  transform={`translate(${803 + tapeWidth}, 674)`}
+                {/* Draggable Industrial Packing Tape Gun */}
+                <TapeDispenserGun
+                  ref={tapeGunGroupRef}
+                  variant="box"
+                  transform="translate(803, 674)"
                   onPointerDown={handlePointerDown}
-                  className="cursor-grab active:cursor-grabbing transition-transform duration-75 select-none"
+                  className="cursor-grab active:cursor-grabbing select-none"
                   style={{ touchAction: 'none' }}
-                >
-                  <path d="M-5 -25 L25 -25 L32 0 L-2 10 Z" fill="#dc2626" stroke="#991b1b" strokeWidth="2.5" filter="drop-shadow(0 3px 6px rgba(0,0,0,0.6))" />
-                  <circle cx="12" cy="-12" r="14" fill="#f59e0b" stroke="#b45309" strokeWidth="2" />
-                  <circle cx="12" cy="-12" r="5" fill="#1e293b" />
-                  <rect x="-10" y="5" width="12" height="26" rx="3" fill="#0f172a" />
-                  <rect x="22" y="2" width="8" height="6" fill="#475569" />
-                  {!isFullySealed && (
-                    <circle cx="12" cy="-12" r="22" fill="none" stroke="#fbbf24" strokeWidth="2" strokeDasharray="4,3" className="animate-spin" style={{ animationDuration: '4s' }} />
-                  )}
-                </g>
+                />
 
                 {/* Typewriter Speech Bubble */}
-                {displayedDialogue.length > 0 && (
-                  <g transform="translate(740, 260)">
-                    <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                    <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" filter="drop-shadow(0 10px 24px rgba(0,0,0,0.8))" />
-                    <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
-                    <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
-                      TARIQ (PACKER)
-                    </text>
-                    <text x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                      "{displayedDialogue.slice(0, 36)}
-                    </text>
-                    <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                      {displayedDialogue.slice(36)}
-                      {!isTypingComplete && <tspan fill="#f59e0b" className="animate-pulse">|</tspan>}
-                      {isTypingComplete && '"'}
-                    </text>
-                  </g>
-                )}
+                <g ref={speechBubbleGroupRef} transform="translate(740, 260)" style={{ display: 'none' }}>
+                  <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
+                  <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
+                  <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
+                  <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
+                    TARIQ (PACKER)
+                  </text>
+                  <text ref={speechLine1Ref} x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600" />
+                  <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
+                    <tspan ref={speechLine2TextRef} />
+                    <tspan ref={speechCursorRef} fill="#f59e0b" className="animate-pulse">|</tspan>
+                  </text>
+                </g>
               </g>
             )}
           </svg>
+          )}
 
           {/* =========================================================================
-              HARDWARE-ACCELERATED FULL-BLEED CSS CLOUDS & TITLE DESCENT OVERLAY
+              HARDWARE-ACCELERATED FULL-BLEED CSS CLOUDS OVERLAY (ZERO BLUR FILTER)
+              Uses 180vmax × 180vmax aspect-locked square layers so portrait mobile
+              screens never squash horizontal clouds into vertical slits.
               ========================================================================= */}
-          {cloudOpacity > 0 && (
+          <div
+            ref={cloudOverlayRef}
+            className="absolute inset-0 z-10 pointer-events-none overflow-hidden transform-gpu"
+            style={{
+              willChange: 'opacity',
+              transform: 'translateZ(0)',
+            }}
+          >
+            {/* Deep atmospheric base */}
+            <div className="absolute inset-0 bg-[#05070c]" />
+
+            {/* Left Cloud Bank — wide horizontal stratocumulus & cumulus puffs in a 1:1 physical square */}
             <div
-              className="absolute inset-0 pointer-events-none overflow-hidden transform-gpu"
+              ref={leftCloudRef}
+              className="absolute transform-gpu will-change-transform"
               style={{
-                opacity: cloudOpacity,
-                transition: 'opacity 0.1s linear',
-                willChange: 'opacity, transform',
-                transform: 'translateZ(0)',
+                width: '180vmax',
+                height: '180vmax',
+                left: 'calc(50% - 90vmax)',
+                top: 'calc(50% - 90vmax)',
+                transform: 'translate3d(0%, 0, 0) scale3d(1, 1, 1)',
+                transformOrigin: '35% 50%',
+                background: [
+                  'radial-gradient(ellipse 36% 18% at 36% 42%, rgba(254, 215, 170, 0.78) 0%, rgba(203, 213, 225, 0.52) 45%, rgba(148, 163, 184, 0.18) 72%, transparent 95%)',
+                  'radial-gradient(ellipse 40% 22% at 44% 56%, rgba(203, 213, 225, 0.72) 0%, rgba(148, 163, 184, 0.42) 48%, rgba(71, 85, 105, 0.15) 75%, transparent 96%)',
+                  'radial-gradient(ellipse 32% 16% at 28% 52%, rgba(226, 232, 240, 0.65) 0%, rgba(148, 163, 184, 0.32) 52%, transparent 92%)',
+                ].join(', '),
+              }}
+            />
+
+            {/* Right Cloud Bank — wide horizontal stratocumulus & cumulus puffs in a 1:1 physical square */}
+            <div
+              ref={rightCloudRef}
+              className="absolute transform-gpu will-change-transform"
+              style={{
+                width: '180vmax',
+                height: '180vmax',
+                left: 'calc(50% - 90vmax)',
+                top: 'calc(50% - 90vmax)',
+                transform: 'translate3d(0%, 0, 0) scale3d(1, 1, 1)',
+                transformOrigin: '65% 50%',
+                background: [
+                  'radial-gradient(ellipse 38% 19% at 64% 46%, rgba(254, 215, 170, 0.78) 0%, rgba(203, 213, 225, 0.52) 45%, rgba(148, 163, 184, 0.18) 72%, transparent 95%)',
+                  'radial-gradient(ellipse 40% 21% at 56% 36%, rgba(203, 213, 225, 0.7) 0%, rgba(148, 163, 184, 0.4) 48%, rgba(71, 85, 105, 0.15) 75%, transparent 96%)',
+                  'radial-gradient(ellipse 34% 17% at 70% 58%, rgba(226, 232, 240, 0.65) 0%, rgba(148, 163, 184, 0.32) 52%, transparent 92%)',
+                ].join(', '),
+              }}
+            />
+
+            {/* Central Fog Plume — wide horizontal atmospheric haze in a 1:1 physical square */}
+            <div
+              ref={centerFogRef}
+              className="absolute inset-0 flex items-center justify-center transform-gpu will-change-transform"
+              style={{
+                transform: 'scale3d(1, 1, 1)',
+                transformOrigin: 'center center',
               }}
             >
-              <div className="absolute inset-0 bg-[#05070c]" />
-
-              {/* Left Cloud Bank */}
               <div
-                className="absolute -top-[20%] -left-[30%] w-[120%] h-[140%] transform-gpu"
+                className="flex-shrink-0"
                 style={{
-                  transform: `translate3d(${cloudPartLeft}%, 0, 0) scale3d(${cloudScale}, ${cloudScale}, 1)`,
-                  transformOrigin: '20% 50%',
-                  background:
-                    'radial-gradient(circle at 30% 40%, rgba(254, 215, 170, 0.85) 0%, rgba(203, 213, 225, 0.75) 35%, rgba(148, 163, 184, 0.4) 60%, transparent 80%)',
-                  filter: 'blur(35px)',
+                  width: '180vmax',
+                  height: '180vmax',
+                  background: [
+                    'radial-gradient(ellipse 42% 24% at 50% 48%, rgba(255, 237, 213, 0.65) 0%, rgba(148, 163, 184, 0.48) 38%, rgba(30, 41, 59, 0.55) 68%, transparent 95%)',
+                    'radial-gradient(ellipse 46% 28% at 48% 54%, rgba(203, 213, 225, 0.45) 0%, rgba(71, 85, 105, 0.38) 48%, transparent 92%)',
+                  ].join(', '),
                 }}
               />
+            </div>
 
-              {/* Right Cloud Bank */}
-              <div
-                className="absolute -top-[20%] -right-[30%] w-[120%] h-[140%] transform-gpu"
-                style={{
-                  transform: `translate3d(${cloudPartRight}%, 0, 0) scale3d(${cloudScale}, ${cloudScale}, 1)`,
-                  transformOrigin: '80% 50%',
-                  background:
-                    'radial-gradient(circle at 70% 45%, rgba(254, 215, 170, 0.85) 0%, rgba(203, 213, 225, 0.75) 35%, rgba(148, 163, 184, 0.4) 60%, transparent 80%)',
-                  filter: 'blur(35px)',
-                }}
-              />
+            {/* Seamless Top & Bottom Atmospheric Vignette Blend into Hero Section */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(to bottom, #0b0b0b 0%, rgba(11, 11, 11, 0.4) 6%, transparent 18%, transparent 85%, rgba(5, 7, 12, 0.6) 100%)',
+              }}
+            />
+          </div>
 
-              {/* Central Fog Plume */}
+          {/* =========================================================================
+              TITLE SPLIT CURTAIN LAYER (STRICTLY ABOVE CLOUDS - PARTS TO SIDES ON SCROLL)
+              ========================================================================= */}
+          <div
+            ref={titleContainerRef}
+            className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden select-none"
+          >
+            <div className="relative w-full max-w-6xl px-4 sm:px-8 flex items-center justify-center">
+              {/* Left Parting Wing */}
               <div
-                className="absolute inset-0 flex items-center justify-center transform-gpu"
+                ref={leftWingRef}
+                className="w-1/2 text-right pr-3 sm:pr-6 md:pr-8 flex flex-col items-end transform-gpu will-change-transform"
                 style={{
-                  transform: `scale3d(${1 + cloudProgress * 2.5}, ${1 + cloudProgress * 2.5}, 1)`,
-                  transformOrigin: 'center center',
+                  transform: 'translate3d(0%, 0, 0)',
                 }}
               >
-                <div
-                  className="w-[120vw] h-[120vh]"
-                  style={{
-                    background:
-                      'radial-gradient(ellipse at center, rgba(255, 237, 213, 0.7) 0%, rgba(148, 163, 184, 0.55) 40%, rgba(30, 41, 59, 0.85) 75%, #05070c 100%)',
-                    filter: 'blur(45px)',
-                  }}
-                />
+                <div className="font-mono text-[9px] sm:text-xs text-[#c9a47a] tracking-[0.25em] uppercase font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                  A NARRATIVE JOURNEY
+                </div>
+                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-normal tracking-wide whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
+                  The Story of
+                </h1>
+                <p className="font-sans text-[10px] sm:text-xs md:text-sm text-[#f4efe8]/90 font-light tracking-wide whitespace-nowrap drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                  A single Rs. 4,500 COD order
+                </p>
               </div>
 
-              {/* Floating Title Card on Clouds */}
-              {titleOpacity > 0 && (
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pointer-events-none transform-gpu"
-                  style={{
-                    opacity: titleOpacity,
-                    transform: `scale3d(${titleScale}, ${titleScale}, 1)`,
-                    transformOrigin: 'center center',
-                  }}
-                >
-                  <div className="absolute w-[90vw] max-w-lg h-36 bg-black/60 rounded-full blur-2xl" />
+              {/* Subtle Center Golden Hairline Divider (Dissolves as scroll starts) */}
+              <div
+                ref={splitDividerRef}
+                className="h-20 sm:h-28 w-[1.5px] bg-gradient-to-b from-transparent via-[#c9a47a]/80 to-transparent flex-shrink-0 flex items-center justify-center"
+              >
+                <div className="w-2 h-2 rotate-45 border border-[#c9a47a] bg-[#0b0b0b] shadow-[0_0_8px_rgba(201,164,122,0.8)]" />
+              </div>
 
-                  <div className="relative z-10 space-y-2">
-                    <div className="font-mono text-[10px] sm:text-xs text-[#c9a47a] tracking-[0.25em] uppercase font-bold">
-                      A NARRATIVE JOURNEY ACROSS PAKISTAN
-                    </div>
-
-                    <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl text-[#fef08a] font-normal tracking-wide drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
-                      The Story of a Saved Delivery
-                    </h1>
-
-                    <p className="font-sans text-[11px] sm:text-xs md:text-sm text-[#f4efe8]/85 font-light tracking-wider max-w-md mx-auto">
-                      How a single Rs. 4,500 Cash-on-Delivery order survived the doorstep crisis
-                    </p>
-                  </div>
+              {/* Right Parting Wing */}
+              <div
+                ref={rightWingRef}
+                className="w-1/2 text-left pl-3 sm:pl-6 md:pl-8 flex flex-col items-start transform-gpu will-change-transform"
+                style={{
+                  transform: 'translate3d(0%, 0, 0)',
+                }}
+              >
+                <div className="font-mono text-[9px] sm:text-xs text-[#c9a47a] tracking-[0.25em] uppercase font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                  ACROSS PAKISTAN
                 </div>
-              )}
+                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-normal tracking-wide whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
+                  a Failed Delivery
+                </h1>
+                <p className="font-sans text-[10px] sm:text-xs md:text-sm text-[#f4efe8]/90 font-light tracking-wide whitespace-nowrap drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                  surviving the doorstep crisis
+                </p>
+              </div>
             </div>
-          )}
+
+            {/* Scroll Cue Prompt at Bottom */}
+            <div
+              ref={scrollPromptRef}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 font-mono text-[10px] tracking-widest text-[#dfc29f]/80 uppercase pointer-events-none"
+            >
+              <span>SCROLL TO ENTER WAREHOUSE</span>
+              <span className="text-[#c9a47a] animate-bounce text-xs">↓</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

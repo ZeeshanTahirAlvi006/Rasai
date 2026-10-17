@@ -23,7 +23,7 @@ export const createPresignedUploadUrlController = asyncHandler(
 export const commitImportBatchController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const { batchId } = req.params;
+    const batchId = String(req.params.batchId);
     const result = await commitImportBatchService(merchantId, batchId);
     return res.status(result.status).json({
       success: result.success,
@@ -37,7 +37,7 @@ export const commitImportBatchController = asyncHandler(
 export const getImportBatchStatusController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const { batchId } = req.params;
+    const batchId = String(req.params.batchId);
     const result = await getImportBatchStatusService(merchantId, batchId);
     return res.status(result.status).json({
       success: result.success,

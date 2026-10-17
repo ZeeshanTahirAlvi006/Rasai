@@ -620,6 +620,7 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
   const starBgCanvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const fgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const svgElementRef = useRef<SVGSVGElement>(null);
   const svgTransformGroupRef = useRef<SVGGElement>(null);
   const arrowGroupRef = useRef<SVGGElement>(null);
   const ghostStop0Ref = useRef<SVGStopElement>(null);
@@ -631,6 +632,95 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
   const isPausedRef = useRef<boolean>(false);
   const lastWarpStateRef = useRef<boolean>(false);
   const firedCuesRef = useRef<Set<string>>(new Set());
+  const activeRafRef = useRef<number>(0);
+
+  // Dirty-tracking refs so we never write unchanged DOM/SVG styles or clear idle canvases
+  const lastPostKeyRef = useRef<string>('');
+  const lastGhostKeyRef = useRef<string>('');
+  const lastCameraKeyRef = useRef<string>('');
+  const starWasActiveRef = useRef<boolean>(true);
+  const bgWasActiveRef = useRef<boolean>(true);
+
+  // Cached layout & canvas contexts to prevent Forced Synchronous Layout (reflow) on every frame
+  const layoutMetricsRef = useRef<{
+    viewW: number;
+    viewH: number;
+    stageW: number;
+    stageScale: number;
+    dpr: number;
+  }>({
+    viewW: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    viewH: typeof window !== 'undefined' ? window.innerHeight : 720,
+    stageW: 320,
+    stageScale: 0.5,
+    dpr: 1,
+  });
+
+  const canvasCtxsRef = useRef<{
+    star: CanvasRenderingContext2D | null;
+    bg: CanvasRenderingContext2D | null;
+    fg: CanvasRenderingContext2D | null;
+  }>({
+    star: null,
+    bg: null,
+    fg: null,
+  });
+
+  const measureLayoutAndCanvases = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rootRect = containerRef.current?.getBoundingClientRect();
+    const viewW = Math.max(1, rootRect && rootRect.width > 0 ? rootRect.width : window.innerWidth);
+    const viewH = Math.max(1, rootRect && rootRect.height > 0 ? rootRect.height : window.innerHeight);
+    const stageW = logoSlideRef.current?.offsetWidth || Math.min(420, Math.max(175, viewW * 0.56));
+    // Match stage canvas resolution to actual physical stage size (instead of oversized 2560x1440 on mobile)
+    const stageScale = Math.min(dpr, Math.max(0.3, (stageW * dpr) / 1280));
+
+    layoutMetricsRef.current = { viewW, viewH, stageW, stageScale, dpr };
+    lastPostKeyRef.current = '';
+
+    if (textRevealRef.current) {
+      const emblemVisualW = stageW * (836 / 1280);
+      const emblemVisualH = stageW * (604 / 1280);
+      textRevealRef.current.style.setProperty('--emblem-w', `${emblemVisualW.toFixed(1)}px`);
+      textRevealRef.current.style.setProperty('--emblem-h', `${emblemVisualH.toFixed(1)}px`);
+    }
+
+    const starBgCanvas = starBgCanvasRef.current;
+    const bgCanvas = bgCanvasRef.current;
+    const fgCanvas = fgCanvasRef.current;
+    if (!starBgCanvas || !bgCanvas || !fgCanvas) return;
+
+    const starTargetW = Math.round(viewW * dpr);
+    const starTargetH = Math.round(viewH * dpr);
+    if (starBgCanvas.width !== starTargetW || starBgCanvas.height !== starTargetH) {
+      starBgCanvas.width = starTargetW;
+      starBgCanvas.height = starTargetH;
+      starWasActiveRef.current = true;
+    }
+
+    const targetW = Math.max(1, Math.round(1280 * stageScale));
+    const targetH = Math.max(1, Math.round(720 * stageScale));
+    if (bgCanvas.width !== targetW || bgCanvas.height !== targetH) {
+      bgCanvas.width = targetW;
+      bgCanvas.height = targetH;
+      bgWasActiveRef.current = true;
+    }
+    if (fgCanvas.width !== targetW || fgCanvas.height !== targetH) {
+      fgCanvas.width = targetW;
+      fgCanvas.height = targetH;
+    }
+
+    if (!canvasCtxsRef.current.star) {
+      canvasCtxsRef.current.star = starBgCanvas.getContext('2d');
+    }
+    if (!canvasCtxsRef.current.bg) {
+      canvasCtxsRef.current.bg = bgCanvas.getContext('2d');
+    }
+    if (!canvasCtxsRef.current.fg) {
+      canvasCtxsRef.current.fg = fgCanvas.getContext('2d');
+    }
+  }, []);
 
   // ==========================================================================
   // PURE FRAME RENDERER: render(t) (t in seconds, 0.000 -> 12.300)
@@ -672,11 +762,7 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
 
       // ----------------------------------------------------------------------
       // POST-COMPLETION CHOREOGRAPHY (tFull = 9.55s -> 12.25s):
-      // 1. During t = 0..9.55s (shiftProgress = 0): Logo is 100% dead-center on
-      //    ALL screen sizes (mobile, small, medium, desktop).
-      // 2. From 9.55s -> 10.75s: Logo smoothly glides to the left side.
-      // 3. From 10.15s -> 12.20s: Stacked Urdu ("رسائی" in font-urdu matching
-      //    header) + English ("rasai") emerges slowly from the background with glare.
+      // Dirty-checked so 0 HTML DOM style writes occur during t = 0..9.55s
       // ----------------------------------------------------------------------
       const shiftProgress = easeInOutCubic(invLerp(9.55, 10.75, tFull));
       const textAppearProgress = easeOutCubic(invLerp(10.15, 12.0, tFull));
@@ -686,76 +772,67 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
           ? Math.pow(Math.sin(glareProgress * Math.PI), 1.35)
           : 0;
 
-      const stageW = logoSlideRef.current?.offsetWidth || 320;
-      // In 1280x720 reference space, the resting logo spans x=256..1092 (836px) and y=35..639 (604px)
-      const emblemVisualW = stageW * (836 / 1280);
-      const emblemVisualH = stageW * (604 / 1280);
-      const gapPx = clamp(stageW * 0.09, 16, 44);
+      const { viewW, viewH, stageW, stageScale, dpr } = layoutMetricsRef.current;
+      const postKey = `${shiftProgress.toFixed(4)}_${textAppearProgress.toFixed(4)}_${glareIntensity.toFixed(4)}`;
 
-      if (textRevealRef.current) {
-        // Set CSS variables so Urdu "رسائی" + English "rasai" match the exact height & width footprint of the logo
-        textRevealRef.current.style.setProperty('--emblem-w', `${emblemVisualW.toFixed(1)}px`);
-        textRevealRef.current.style.setProperty('--emblem-h', `${emblemVisualH.toFixed(1)}px`);
-      }
+      if (postKey !== lastPostKeyRef.current) {
+        lastPostKeyRef.current = postKey;
+        const emblemVisualW = stageW * (836 / 1280);
+        const gapPx = clamp(stageW * 0.09, 16, 44);
+        const textW = emblemVisualW;
 
-      const textW = textRevealRef.current?.offsetWidth || emblemVisualW;
+        if (logoSlideRef.current) {
+          const emblemShiftX = -shiftProgress * ((textW + gapPx) * 0.5);
+          logoSlideRef.current.style.transform = `translate3d(calc(-52.656% + ${emblemShiftX.toFixed(2)}px), -50%, 0)`;
+        }
 
-      if (logoSlideRef.current) {
-        // At shiftProgress=0, emblemShiftX=0 -> emblem center (674/1280 = 52.656%) is at exact 50% screen center.
-        // At shiftProgress=1, logo and text sit symmetrically on the left and right of screen center.
-        const emblemShiftX = -shiftProgress * ((textW + gapPx) * 0.5);
-        logoSlideRef.current.style.transform = `translate3d(calc(-52.656% + ${emblemShiftX.toFixed(2)}px), -50%, 0)`;
-      }
+        if (textRevealRef.current) {
+          const textTargetCenterX = (emblemVisualW + gapPx) * 0.5;
+          const emergeOffsetX = lerp(-28, 0, textAppearProgress);
+          const textScale = lerp(0.74, 1.0, textAppearProgress);
 
-      if (textRevealRef.current) {
-        const textTargetCenterX = (emblemVisualW + gapPx) * 0.5;
-        const emergeOffsetX = lerp(-28, 0, textAppearProgress);
-        const textScale = lerp(0.74, 1.0, textAppearProgress);
-        const textBlur = lerp(14, 0, easeOutCubic(invLerp(10.15, 11.75, tFull)));
+          textRevealRef.current.style.opacity = textAppearProgress.toFixed(4);
+          textRevealRef.current.style.transform = `translate3d(calc(-50% + ${(textTargetCenterX + emergeOffsetX).toFixed(2)}px), -50%, 0) scale3d(${textScale.toFixed(4)}, ${textScale.toFixed(4)}, 1)`;
+        }
 
-        textRevealRef.current.style.opacity = textAppearProgress.toFixed(4);
-        textRevealRef.current.style.transform = `translate3d(calc(-50% + ${(textTargetCenterX + emergeOffsetX).toFixed(2)}px), -50%, 0) scale(${textScale.toFixed(4)})`;
-        // Strictly clean blur and no drop-shadow so the background stays completely dark
-        textRevealRef.current.style.filter = textBlur > 0.05 ? `blur(${textBlur.toFixed(2)}px)` : 'none';
-      }
+        // Specular glare effect constrained strictly to the alphabets (zero on background)
+        if (urduGlareRef.current && engGlareRef.current) {
+          if (glareIntensity > 0.001) {
+            const pos = lerp(-35, 135, easeInOutCubic(glareProgress));
+            const urduGrad = `linear-gradient(112deg, transparent 0%, transparent calc(${pos}% - 24%), rgba(190, 225, 255, 0.45) calc(${pos}% - 12%), rgba(255, 255, 255, 1) calc(${pos}% - 2%), rgba(255, 255, 255, 1) calc(${pos}% + 2%), rgba(190, 225, 255, 0.45) calc(${pos}% + 12%), transparent calc(${pos}% + 24%), transparent 100%)`;
 
-      // Specular glare effect constrained strictly to the alphabets (zero on background)
-      if (urduGlareRef.current && engGlareRef.current) {
-        if (glareIntensity > 0.001) {
-          const pos = lerp(-35, 135, easeInOutCubic(glareProgress));
-          const urduGrad = `linear-gradient(112deg, transparent 0%, transparent calc(${pos}% - 24%), rgba(190, 225, 255, 0.45) calc(${pos}% - 12%), rgba(255, 255, 255, 1) calc(${pos}% - 2%), rgba(255, 255, 255, 1) calc(${pos}% + 2%), rgba(190, 225, 255, 0.45) calc(${pos}% + 12%), transparent calc(${pos}% + 24%), transparent 100%)`;
+            urduGlareRef.current.style.backgroundImage = urduGrad;
+            urduGlareRef.current.style.opacity = (glareIntensity * 1.0).toFixed(4);
 
-          urduGlareRef.current.style.backgroundImage = urduGrad;
-          urduGlareRef.current.style.opacity = (glareIntensity * 1.0).toFixed(4);
+            const engPos = pos - 10;
+            const engGrad = `linear-gradient(112deg, transparent 0%, transparent calc(${engPos}% - 24%), rgba(190, 225, 255, 0.45) calc(${engPos}% - 12%), rgba(255, 255, 255, 1) calc(${engPos}% - 2%), rgba(255, 255, 255, 1) calc(${engPos}% + 2%), rgba(190, 225, 255, 0.45) calc(${engPos}% + 12%), transparent calc(${engPos}% + 24%), transparent 100%)`;
 
-          // Diagonal delay for English so light beam sweeps organically across both tiers
-          const engPos = pos - 10;
-          const engGrad = `linear-gradient(112deg, transparent 0%, transparent calc(${engPos}% - 24%), rgba(190, 225, 255, 0.45) calc(${engPos}% - 12%), rgba(255, 255, 255, 1) calc(${engPos}% - 2%), rgba(255, 255, 255, 1) calc(${engPos}% + 2%), rgba(190, 225, 255, 0.45) calc(${engPos}% + 12%), transparent calc(${engPos}% + 24%), transparent 100%)`;
-
-          engGlareRef.current.style.backgroundImage = engGrad;
-          engGlareRef.current.style.opacity = (glareIntensity * 1.0).toFixed(4);
-        } else {
-          urduGlareRef.current.style.opacity = '0';
-          engGlareRef.current.style.opacity = '0';
+            engGlareRef.current.style.backgroundImage = engGrad;
+            engGlareRef.current.style.opacity = (glareIntensity * 1.0).toFixed(4);
+          } else {
+            urduGlareRef.current.style.opacity = '0';
+            engGlareRef.current.style.opacity = '0';
+          }
         }
       }
 
       // ----------------------------------------------------------------------
-      // 1. CAMERA ZOOM-OUT & SLOW PUSH-IN TRANSFORM ON INLINE SVG
+      // 1. CAMERA ZOOM-OUT & SLOW PUSH-IN TRANSFORM ON GPU COMPOSITOR
+      //    Uses CSS translate3d/scale3d on the SVG layer to avoid main-thread SVG path re-tessellation
       // ----------------------------------------------------------------------
       const { s, dx, dy } = getLogoTransformAtTime(t);
-      if (svgTransformGroupRef.current) {
-        const tx = 640 + dx - s * 640;
-        const ty = 360 + dy - s * 360;
-        svgTransformGroupRef.current.setAttribute(
-          'transform',
-          `matrix(${s.toFixed(5)} 0 0 ${s.toFixed(5)} ${tx.toFixed(2)} ${ty.toFixed(2)})`
-        );
+      const cameraKey = `${s.toFixed(4)}_${dx.toFixed(2)}_${dy.toFixed(2)}`;
+      if (cameraKey !== lastCameraKeyRef.current) {
+        lastCameraKeyRef.current = cameraKey;
+        if (svgElementRef.current) {
+          const dxPct = (dx / 12.8).toFixed(3);
+          const dyPct = (dy / 7.2).toFixed(3);
+          svgElementRef.current.style.transform = `translate3d(${dxPct}%, ${dyPct}%, 0) scale3d(${s.toFixed(5)}, ${s.toFixed(5)}, 1)`;
+        }
       }
 
       // ----------------------------------------------------------------------
-      // 4. ARROW GHOSTS (1.40–2.20s fade to ~0.30 cool gray #4E5255, hold to 5.0s,
-      //    5.0–5.5s snap back to 1.0 with ~100ms 1.2x brightness pop)
+      // 4. ARROW GHOSTS (Dirty-checked so SVG stops/styles only update during active transitions)
       // ----------------------------------------------------------------------
       let ghostFactor = 0;
       if (t >= 1.4 && t < 2.35) {
@@ -773,92 +850,80 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
         popBrightness = 1 + 0.2 * Math.sin(((t - 5.32) / 0.26) * Math.PI);
       }
 
-      if (ghostStop0Ref.current && ghostStop1Ref.current && ghostStop2Ref.current) {
-        const midR = Math.round(lerp(220, 128, ghostFactor) * popBrightness);
-        const midG = Math.round(lerp(220, 132, ghostFactor) * popBrightness);
-        const midB = Math.round(lerp(220, 136, ghostFactor) * popBrightness);
+      const ghostKey = `${ghostFactor.toFixed(3)}_${popBrightness.toFixed(3)}`;
+      if (ghostKey !== lastGhostKeyRef.current) {
+        lastGhostKeyRef.current = ghostKey;
+        if (ghostStop0Ref.current && ghostStop1Ref.current && ghostStop2Ref.current) {
+          const midR = Math.round(lerp(220, 128, ghostFactor) * popBrightness);
+          const midG = Math.round(lerp(220, 132, ghostFactor) * popBrightness);
+          const midB = Math.round(lerp(220, 136, ghostFactor) * popBrightness);
 
-        const headR = Math.round(lerp(248, 76, ghostFactor) * popBrightness);
-        const headG = Math.round(lerp(248, 80, ghostFactor) * popBrightness);
-        const headB = Math.round(lerp(248, 84, ghostFactor) * popBrightness);
+          const headR = Math.round(lerp(248, 76, ghostFactor) * popBrightness);
+          const headG = Math.round(lerp(248, 80, ghostFactor) * popBrightness);
+          const headB = Math.round(lerp(248, 84, ghostFactor) * popBrightness);
 
-        const footV = clamp(Math.round(218 * popBrightness), 0, 255);
-        ghostStop0Ref.current.setAttribute('stop-color', `rgb(${footV}, ${footV}, ${footV})`);
-        ghostStop1Ref.current.setAttribute(
-          'stop-color',
-          `rgb(${clamp(midR, 0, 255)}, ${clamp(midG, 0, 255)}, ${clamp(midB, 0, 255)})`
-        );
-        ghostStop2Ref.current.setAttribute(
-          'stop-color',
-          `rgb(${clamp(headR, 0, 255)}, ${clamp(headG, 0, 255)}, ${clamp(headB, 0, 255)})`
-        );
-      }
-      if (arrowGroupRef.current) {
-        const bevelOpacity = lerp(1, 0.32, ghostFactor);
-        arrowGroupRef.current.style.setProperty('--arrow-bevel-opacity', bevelOpacity.toFixed(3));
+          const footV = clamp(Math.round(218 * popBrightness), 0, 255);
+          ghostStop0Ref.current.setAttribute('stop-color', `rgb(${footV}, ${footV}, ${footV})`);
+          ghostStop1Ref.current.setAttribute(
+            'stop-color',
+            `rgb(${clamp(midR, 0, 255)}, ${clamp(midG, 0, 255)}, ${clamp(midB, 0, 255)})`
+          );
+          ghostStop2Ref.current.setAttribute(
+            'stop-color',
+            `rgb(${clamp(headR, 0, 255)}, ${clamp(headG, 0, 255)}, ${clamp(headB, 0, 255)})`
+          );
+        }
+        if (arrowGroupRef.current) {
+          const bevelOpacity = lerp(1, 0.32, ghostFactor);
+          arrowGroupRef.current.style.setProperty('--arrow-bevel-opacity', bevelOpacity.toFixed(3));
+        }
       }
 
       // ----------------------------------------------------------------------
-      // PREPARE FULL-HERO STAR/HYPERSPACE CANVAS (Covers 100% width AND height on all viewports)
-      // AND 1280x720 LOGO STAGE CANVASES
+      // PREPARE FULL-HERO STAR/HYPERSPACE CANVAS & 1280x720 LOGO STAGE CANVASES
       // ----------------------------------------------------------------------
-      const starBgCanvas = starBgCanvasRef.current;
-      const bgCanvas = bgCanvasRef.current;
-      const fgCanvas = fgCanvasRef.current;
-      if (!starBgCanvas || !bgCanvas || !fgCanvas || !sprites) return;
-
-      const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
-
-      // Full-hero viewport dimensions (supports mobile portrait <1200px, tablet, desktop, ultrawide)
-      const rootRect = containerRef.current?.getBoundingClientRect();
-      const viewW = Math.max(1, rootRect && rootRect.width > 0 ? rootRect.width : window.innerWidth);
-      const viewH = Math.max(1, rootRect && rootRect.height > 0 ? rootRect.height : window.innerHeight);
-      const starTargetW = Math.round(viewW * dpr);
-      const starTargetH = Math.round(viewH * dpr);
-      if (starBgCanvas.width !== starTargetW || starBgCanvas.height !== starTargetH) {
-        starBgCanvas.width = starTargetW;
-        starBgCanvas.height = starTargetH;
+      if (!sprites) return;
+      if (!canvasCtxsRef.current.star || !canvasCtxsRef.current.bg || !canvasCtxsRef.current.fg) {
+        measureLayoutAndCanvases();
       }
-
-      const targetW = Math.round(1280 * dpr);
-      const targetH = Math.round(720 * dpr);
-      if (bgCanvas.width !== targetW || bgCanvas.height !== targetH) {
-        bgCanvas.width = targetW;
-        bgCanvas.height = targetH;
-      }
-      if (fgCanvas.width !== targetW || fgCanvas.height !== targetH) {
-        fgCanvas.width = targetW;
-        fgCanvas.height = targetH;
-      }
-
-      const starCtx = starBgCanvas.getContext('2d');
-      const bgCtx = bgCanvas.getContext('2d');
-      const fgCtx = fgCanvas.getContext('2d');
+      const starCtx = canvasCtxsRef.current.star;
+      const bgCtx = canvasCtxsRef.current.bg;
+      const fgCtx = canvasCtxsRef.current.fg;
       if (!starCtx || !bgCtx || !fgCtx) return;
 
-      // COVER transform for starCtx: Math.max(viewW/1280, viewH/720) guarantees 100% height AND width coverage!
-      const coverScale = Math.max(viewW / 1280, viewH / 720);
-      const coverOffsetX = (viewW - 1280 * coverScale) * 0.5;
-      const coverOffsetY = (viewH - 720 * coverScale) * 0.5;
+      const starActive = (t >= 2.25 && t <= 5.1) || t >= 9.0;
+      const bgActive = t >= 5.5 && t <= 6.55;
+      const starSaved = starActive || starWasActiveRef.current;
+      const bgSaved = bgActive || bgWasActiveRef.current;
 
-      starCtx.save();
-      starCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      starCtx.clearRect(0, 0, viewW, viewH);
-      starCtx.setTransform(
-        dpr * coverScale,
-        0,
-        0,
-        dpr * coverScale,
-        dpr * coverOffsetX,
-        dpr * coverOffsetY
-      );
+      if (starSaved) {
+        const coverScale = Math.max(viewW / 1280, viewH / 720);
+        const coverOffsetX = (viewW - 1280 * coverScale) * 0.5;
+        const coverOffsetY = (viewH - 720 * coverScale) * 0.5;
 
-      bgCtx.save();
-      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      bgCtx.clearRect(0, 0, 1280, 720);
+        starCtx.save();
+        starCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        starCtx.clearRect(0, 0, viewW, viewH);
+        starCtx.setTransform(
+          dpr * coverScale,
+          0,
+          0,
+          dpr * coverScale,
+          dpr * coverOffsetX,
+          dpr * coverOffsetY
+        );
+        starWasActiveRef.current = starActive;
+      }
+
+      if (bgSaved) {
+        bgCtx.save();
+        bgCtx.setTransform(stageScale, 0, 0, stageScale, 0, 0);
+        bgCtx.clearRect(0, 0, 1280, 720);
+        bgWasActiveRef.current = bgActive;
+      }
 
       fgCtx.save();
-      fgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fgCtx.setTransform(stageScale, 0, 0, stageScale, 0, 0);
       fgCtx.clearRect(0, 0, 1280, 720);
 
       // ----------------------------------------------------------------------
@@ -901,14 +966,14 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
             const lx = st.len * stretch * 0.82;
             const ly = -st.len * stretch * 0.57;
 
-            starCtx.strokeStyle = `rgba(255, 255, 255, ${a})`;
+            starCtx.strokeStyle = `rgba(255, 255, 255, ${a.toFixed(3)})`;
             starCtx.lineWidth = st.size;
             starCtx.beginPath();
             starCtx.moveTo(x - lx, y - ly);
             starCtx.lineTo(x, y);
             starCtx.stroke();
 
-            starCtx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, a * 1.3)})`;
+            starCtx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, a * 1.3).toFixed(3)})`;
             starCtx.beginPath();
             starCtx.arc(x, y, st.size * 0.9, 0, Math.PI * 2);
             starCtx.fill();
@@ -916,6 +981,7 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
         }
 
         // 5b. 3.3–5.0s: Radial starburst from ~(610, 390) across the entire hero screen
+        // Zero per-star createLinearGradient allocations (eliminates 240 gradient allocations/frame)
         if (t >= 3.25) {
           const burstEnv =
             t < 4.15 ? smoothStep(3.25, 4.05, t) : 1 - smoothStep(4.35, 5.02, t);
@@ -928,29 +994,34 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
               const dist = bs.r0 + bs.speed * Math.pow(localT, 1.45);
               const rInner = dist % 860;
               const streakLen = (28 + rInner * bs.lenScale) * burstEnv;
+              const rMid = rInner + streakLen * 0.45;
               const rOuter = rInner + streakLen;
 
               const cosA = Math.cos(bs.angle);
               const sinA = Math.sin(bs.angle);
               const x0 = cx + cosA * rInner;
               const y0 = cy + sinA * rInner;
+              const xm = cx + cosA * rMid;
+              const ym = cy + sinA * rMid;
               const x1 = cx + cosA * rOuter;
               const y1 = cy + sinA * rOuter;
 
               const alpha = bs.alpha * burstEnv * clamp(rInner / 120, 0.15, 1);
-              const sGrad = starCtx.createLinearGradient(x0, y0, x1, y1);
-              sGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-              sGrad.addColorStop(0.7, `rgba(240, 245, 255, ${alpha * 0.7})`);
-              sGrad.addColorStop(1, `rgba(255, 255, 255, ${alpha})`);
 
-              starCtx.strokeStyle = sGrad;
               starCtx.lineWidth = bs.width;
+              starCtx.strokeStyle = `rgba(240, 245, 255, ${(alpha * 0.35).toFixed(3)})`;
               starCtx.beginPath();
               starCtx.moveTo(x0, y0);
+              starCtx.lineTo(xm, ym);
+              starCtx.stroke();
+
+              starCtx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(3)})`;
+              starCtx.beginPath();
+              starCtx.moveTo(xm, ym);
               starCtx.lineTo(x1, y1);
               starCtx.stroke();
 
-              starCtx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha * 1.2)})`;
+              starCtx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha * 1.2).toFixed(3)})`;
               starCtx.beginPath();
               starCtx.arc(x1, y1, bs.width * 0.85, 0, Math.PI * 2);
               starCtx.fill();
@@ -1276,18 +1347,20 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
               ? smoothStep(8.52, 8.78, t)
               : 1 - smoothStep(8.82, 9.32, t);
           if (rayEnv > 0.01) {
+            // Single shared radial gradient for all 110 rays (replaces 110 createLinearGradient calls/frame)
+            const maxRayR = 350 * (0.88 + 0.22 * driftU);
+            const sharedRayGrad = fgCtx.createRadialGradient(coreX, coreY, 0, coreX, coreY, maxRayR);
+            sharedRayGrad.addColorStop(0, `rgba(237, 244, 254, ${(0.35 * rayEnv).toFixed(3)})`);
+            sharedRayGrad.addColorStop(0.55, `rgba(200, 222, 250, ${(0.16 * rayEnv).toFixed(3)})`);
+            sharedRayGrad.addColorStop(1, 'rgba(180, 210, 245, 0)');
+            fgCtx.strokeStyle = sharedRayGrad;
+
             for (let i = 0; i < FLARE_RAYS.length; i++) {
               const ray = FLARE_RAYS[i];
               const rLen = ray.len * (0.88 + 0.22 * driftU);
               const rx1 = coreX + Math.cos(ray.angle) * rLen;
               const ry1 = coreY + Math.sin(ray.angle) * rLen;
 
-              const rGrad = fgCtx.createLinearGradient(coreX, coreY, rx1, ry1);
-              rGrad.addColorStop(0, `rgba(237, 244, 254, ${ray.alpha * rayEnv})`);
-              rGrad.addColorStop(0.65, `rgba(200, 222, 250, ${ray.alpha * 0.45 * rayEnv})`);
-              rGrad.addColorStop(1, 'rgba(180, 210, 245, 0)');
-
-              fgCtx.strokeStyle = rGrad;
               fgCtx.lineWidth = ray.width;
               fgCtx.beginPath();
               fgCtx.moveTo(coreX, coreY);
@@ -1352,38 +1425,51 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
         }
       }
 
-      starCtx.restore();
-      bgCtx.restore();
+      if (starSaved) starCtx.restore();
+      if (bgSaved) bgCtx.restore();
       fgCtx.restore();
     },
-    [onAudioCue, onWarpChange]
+    [measureLayoutAndCanvases, onAudioCue, onWarpChange]
   );
 
   // ==========================================================================
   // HIGH-REFRESH R-A-F LOOP (>60 / 120 / 144 / 240 FPS), ?t=, window.__seek(t)
+  // WITH INTERSECTION-OBSERVER VIEWPORT HIBERNATION
   // ==========================================================================
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    let rafId = 0;
     let startWallTime = performance.now();
+    let isInViewport = true;
+
+    measureLayoutAndCanvases();
 
     // Expose window.__seek(t) for frame-accurate scrubbing & verification
     window.__seek = (t: number) => {
       isPausedRef.current = true;
-      if (rafId) cancelAnimationFrame(rafId);
+      if (activeRafRef.current) cancelAnimationFrame(activeRafRef.current);
+      measureLayoutAndCanvases();
       render(clamp(t, 0, TOTAL_DURATION));
     };
     window.__renderAt = window.__seek;
     window.__getCurrentTime = () => currentTimeRef.current;
 
-    // Re-render current frame on viewport resize so full-screen starBgCanvas never clips on mobile/<1200px
+    // Re-measure and re-render current frame on viewport resize
     const handleResize = () => {
-      if (isPausedRef.current) {
+      measureLayoutAndCanvases();
+      if (isPausedRef.current || !isInViewport) {
         render(currentTimeRef.current);
       }
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' && containerRef.current
+        ? new ResizeObserver(() => handleResize())
+        : null;
+    if (resizeObserver && containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
 
     // Check URL query parameter ?t=4.25
     const params = new URLSearchParams(window.location.search);
@@ -1392,8 +1478,9 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
       isPausedRef.current = true;
       render(clamp(parseFloat(tParam), 0, TOTAL_DURATION));
       return () => {
-        if (rafId) cancelAnimationFrame(rafId);
+        if (activeRafRef.current) cancelAnimationFrame(activeRafRef.current);
         window.removeEventListener('resize', handleResize);
+        resizeObserver?.disconnect();
       };
     }
 
@@ -1403,8 +1490,9 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
       isPausedRef.current = true;
       render(TOTAL_DURATION);
       return () => {
-        if (rafId) cancelAnimationFrame(rafId);
+        if (activeRafRef.current) cancelAnimationFrame(activeRafRef.current);
         window.removeEventListener('resize', handleResize);
+        resizeObserver?.disconnect();
       };
     }
 
@@ -1412,6 +1500,7 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
       render(0);
       return () => {
         window.removeEventListener('resize', handleResize);
+        resizeObserver?.disconnect();
       };
     }
 
@@ -1419,14 +1508,14 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
     firedCuesRef.current.clear();
 
     const tick = (now: number) => {
-      if (isPausedRef.current) return;
+      if (isPausedRef.current || !isInViewport || document.hidden) return;
       const elapsedSec = (now - startWallTime) / 1000;
       if (elapsedSec >= TOTAL_DURATION) {
         if (loop) {
           startWallTime = now;
           firedCuesRef.current.clear();
           render(0);
-          rafId = requestAnimationFrame(tick);
+          activeRafRef.current = requestAnimationFrame(tick);
         } else {
           render(TOTAL_DURATION);
           isPausedRef.current = true;
@@ -1434,19 +1523,47 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
         return;
       }
       render(elapsedSec);
-      rafId = requestAnimationFrame(tick);
+      activeRafRef.current = requestAnimationFrame(tick);
     };
+
+    const intersectionObserver =
+      typeof IntersectionObserver !== 'undefined' && containerRef.current
+        ? new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0];
+              if (!entry) return;
+              const wasInViewport = isInViewport;
+              isInViewport = entry.isIntersecting;
+              if (!isInViewport && activeRafRef.current) {
+                cancelAnimationFrame(activeRafRef.current);
+                activeRafRef.current = 0;
+              } else if (isInViewport && !wasInViewport && !isPausedRef.current) {
+                startWallTime = performance.now() - currentTimeRef.current * 1000;
+                activeRafRef.current = requestAnimationFrame(tick);
+              }
+            },
+            { threshold: 0.01 }
+          )
+        : null;
+
+    if (intersectionObserver && containerRef.current) {
+      intersectionObserver.observe(containerRef.current);
+    }
 
     render(0);
-    rafId = requestAnimationFrame(tick);
+    activeRafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      if (activeRafRef.current) cancelAnimationFrame(activeRafRef.current);
       window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
     };
-  }, [autoPlay, loop, render]);
+  }, [autoPlay, loop, measureLayoutAndCanvases, render]);
 
   const handleReplay = () => {
+    if (activeRafRef.current) cancelAnimationFrame(activeRafRef.current);
+    measureLayoutAndCanvases();
     firedCuesRef.current.clear();
     isPausedRef.current = false;
     const startWall = performance.now();
@@ -1459,10 +1576,10 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
         return;
       }
       render(elapsed);
-      requestAnimationFrame(step);
+      activeRafRef.current = requestAnimationFrame(step);
     };
     render(0);
-    requestAnimationFrame(step);
+    activeRafRef.current = requestAnimationFrame(step);
   };
 
   return (
@@ -1512,11 +1629,12 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
 
             {/* LAYER 2: Inline SVG Logo split into #body and #arrow in 1280x720 reference space */}
             <svg
+              ref={svgElementRef}
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 1280 720"
               preserveAspectRatio="xMidYMid meet"
-              className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-              style={{ zIndex: 2 }}
+              className="absolute inset-0 w-full h-full pointer-events-none overflow-visible will-change-transform"
+              style={{ zIndex: 2, transformOrigin: '50% 50%' }}
             >
               <defs>
                 <linearGradient
@@ -1613,11 +1731,10 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
             Sized to match --emblem-w and --emblem-h so logo and text take equal space on the screen */}
         <div
           ref={textRevealRef}
-          className="absolute left-1/2 top-1/2 z-10 pointer-events-none will-change-[transform,opacity,filter]"
+          className="absolute left-1/2 top-1/2 z-10 pointer-events-none will-change-[transform,opacity]"
           style={{
             opacity: 0,
-            transform: 'translate3d(-50%, -50%, 0) scale(0.74)',
-            filter: 'blur(14px) brightness(1)',
+            transform: 'translate3d(-50%, -50%, 0) scale3d(0.74, 0.74, 1)',
             minWidth: 'var(--emblem-w, 220px)',
             minHeight: 'var(--emblem-h, 160px)',
           }}

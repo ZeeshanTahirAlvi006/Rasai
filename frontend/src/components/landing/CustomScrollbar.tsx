@@ -1,44 +1,107 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const THUMB_HEIGHT = 42;
+
 export const CustomScrollbar: React.FC = () => {
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [isInStory, setIsInStory] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
   const dragStartYRef = useRef(0);
   const dragStartScrollYRef = useRef(0);
+  const isInStoryRef = useRef(false);
 
-  // Check scroll progress and whether the viewport is inside any story scenes
+  // Zero-re-render scroll thumb positioning & cached scene bounds check
   useEffect(() => {
-    const updateScroll = () => {
+    let rafId = 0;
+    let ticking = false;
+    let maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    let trackHeight = trackRef.current?.clientHeight || window.innerHeight - 128;
+    let vh = window.innerHeight;
+    let storyRanges: Array<{ top: number; bottom: number }> = [];
+
+    const measureLayout = () => {
+      vh = window.innerHeight;
+      maxScroll = Math.max(1, document.documentElement.scrollHeight - vh);
+      if (trackRef.current) {
+        trackHeight = trackRef.current.clientHeight;
+      }
       const scrollY = window.scrollY;
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = maxScroll > 0 ? Math.min(1, Math.max(0, scrollY / maxScroll)) : 0;
-      setScrollProgress(progress);
-
-      // Detect if viewport intersects any story scenes ([data-story-scene="true"] or [id^="movie-scene"])
       const storyScenes = document.querySelectorAll('[data-story-scene="true"], [id^="movie-scene"]');
-      let inStory = false;
-      const vh = window.innerHeight;
-
+      const ranges: Array<{ top: number; bottom: number }> = [];
       storyScenes.forEach((scene) => {
         const rect = scene.getBoundingClientRect();
-        // Custom scrollbar is hidden if the story scene is in view (occupying more than 15% of viewport)
-        if (rect.top < vh * 0.85 && rect.bottom > vh * 0.15) {
-          inStory = true;
-        }
+        ranges.push({
+          top: rect.top + scrollY,
+          bottom: rect.bottom + scrollY,
+        });
       });
-
-      setIsInStory(inStory);
+      storyRanges = ranges;
     };
 
-    window.addEventListener('scroll', updateScroll, { passive: true });
-    window.addEventListener('resize', updateScroll);
-    updateScroll();
+    const updateFrame = () => {
+      ticking = false;
+      const scrollY = window.scrollY;
+      const progress = maxScroll > 0 ? Math.min(1, Math.max(0, scrollY / maxScroll)) : 0;
+
+      if (thumbRef.current) {
+        const maxTravel = Math.max(0, trackHeight - THUMB_HEIGHT);
+        const y = progress * maxTravel;
+        thumbRef.current.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`;
+      }
+
+      // Check story intersection against cached document-space ranges (0 layout reads on scroll)
+      let inStory = false;
+      const viewTop = scrollY + vh * 0.15;
+      const viewBottom = scrollY + vh * 0.85;
+      for (let i = 0; i < storyRanges.length; i++) {
+        const r = storyRanges[i];
+        if (r.top < viewBottom && r.bottom > viewTop) {
+          inStory = true;
+          break;
+        }
+      }
+
+      if (inStory !== isInStoryRef.current) {
+        isInStoryRef.current = inStory;
+        setIsInStory(inStory);
+      }
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        rafId = requestAnimationFrame(updateFrame);
+      }
+    };
+
+    const onResize = () => {
+      measureLayout();
+      onScroll();
+    };
+
+    measureLayout();
+    updateFrame();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => {
+            measureLayout();
+            updateFrame();
+          })
+        : null;
+    if (resizeObserver) {
+      resizeObserver.observe(document.documentElement);
+    }
 
     return () => {
-      window.removeEventListener('scroll', updateScroll);
-      window.removeEventListener('resize', updateScroll);
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      resizeObserver?.disconnect();
     };
   }, []);
 
@@ -55,10 +118,10 @@ export const CustomScrollbar: React.FC = () => {
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging || !trackRef.current) return;
-    const trackRect = trackRef.current.getBoundingClientRect();
+    const trackHeight = trackRef.current.clientHeight || 1;
     const deltaY = e.clientY - dragStartYRef.current;
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    const scrollChange = (deltaY / trackRect.height) * maxScroll;
+    const scrollChange = (deltaY / trackHeight) * maxScroll;
     window.scrollTo({
       top: dragStartScrollYRef.current + scrollChange,
       behavior: 'auto',
@@ -99,16 +162,17 @@ export const CustomScrollbar: React.FC = () => {
       >
         {/* Custom Scroll Thumb */}
         <div
+          ref={thumbRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className={`absolute left-0 right-0 rounded-full transition-transform duration-75 cursor-grab active:cursor-grabbing ${
-            isDragging ? 'bg-[#fef08a] scale-125' : 'bg-[#c9a47a] hover:bg-[#fef08a]'
+          className={`absolute top-0 left-0 right-0 rounded-full cursor-grab active:cursor-grabbing will-change-transform ${
+            isDragging ? 'bg-[#fef08a]' : 'bg-[#c9a47a] hover:bg-[#fef08a]'
           } shadow-[0_0_8px_rgba(201,164,122,0.6)]`}
           style={{
-            height: '42px',
-            top: `calc(${scrollProgress * 100}% - ${scrollProgress * 42}px)`,
+            height: `${THUMB_HEIGHT}px`,
+            transform: 'translate3d(0, 0px, 0)',
             touchAction: 'none',
           }}
         />
