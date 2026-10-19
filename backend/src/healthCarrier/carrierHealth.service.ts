@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { carrierHealthModel, type CarrierHealthDoc } from './carrierHealth.model.js';
 import {
   CARRIERS,
@@ -5,7 +6,8 @@ import {
   type breakerState,
   type CarrierAdapter,
   type CarrierUpdate,
-  type MerchantCarrierCredentials
+  type MerchantCarrierCredentials,
+  type Intent,
 } from '../types/index.js';
 import {
   isRetriableBreakerError,
@@ -17,6 +19,9 @@ import { LeopardsAdapter } from "./adapters/leopards.adapter.js";
 import { Shipment } from "../models/index.js";
 import { touchPolled } from "../shipment/shipment.service.js";
 import { AppError } from "../middleware/error.js";
+import { applyEventDetailed } from "../engine/applyEvent.js";
+import { toEventHashBuffer } from "../shipmentEvent/ShipmentEvent.model.js";
+import { computeEventKey, parseCarrierTimestamp, normalizeCarrierStatus } from "../utils/eventKey.js";
 
 // Common Service Response Interface 
 export interface ServiceResponse<T = any> {
@@ -305,15 +310,16 @@ export const acquireExecutionPermissionService = async (
 
 // Record success service
 export const recordSuccessService = async (
-  carrier: Carrier
+  carrier: Carrier,
+  isCanary = false,
 ): Promise<ServiceResponse<CarrierHealthDoc>> => {
   if (!carrier || !CARRIERS.includes(carrier)) {
     throw new AppError(400, 'carrier is required and must be valid', 'invalid_carrier');
   }
 
-  const doc = await carrierHealthModel.recordSuccess(carrier);
+  const doc = await carrierHealthModel.recordSuccess(carrier, isCanary);
   if (!doc) {
-    throw new AppError(400, `Could not record success for ${carrier}. Circuit may be OPEN.`, 'circuit_open_or_not_found');
+    throw new AppError(400, `Could not record success for ${carrier}. Circuit may be OPEN or non-canary.`, 'circuit_open_or_not_found');
   }
 
   return {
@@ -426,6 +432,55 @@ export const trackShipmentService = async (
       normalizedStatus: carrierAdapter.normalize(u)
     }));
     await touchPolled(carrier, [trackingNumber], merchantId).catch(() => { });
+
+    // Apply discovered carrier events to shipment state machine & ledger (BUG-03)
+    if (merchantId && Types.ObjectId.isValid(merchantId)) {
+      const merchantObjectId = new Types.ObjectId(merchantId);
+      for (const update of trackingData) {
+        try {
+          const rawStatus = update.rawStatus || 'UNKNOWN';
+          const normalized = carrierAdapter.normalize(update) || normalizeCarrierStatus(rawStatus);
+          const intent: Intent = normalized
+            ? { kind: 'CARRIER_STATUS', status: normalized }
+            : { kind: 'INFORMATIONAL' };
+
+          const occurredAt = update.occurredAt
+            ? (parseCarrierTimestamp(update.occurredAt) ?? new Date())
+            : new Date();
+
+          const eventKey = computeEventKey({
+            merchantId: merchantObjectId.toString(),
+            carrier,
+            trackingNumber,
+            rawStatus,
+            rawRemarks: update.rawRemarks || '',
+            occurredAt,
+            carrierEventId: update.carrierEventId,
+          });
+
+          await applyEventDetailed({
+            merchantId: merchantObjectId,
+            carrier,
+            trackingNumber,
+            intent,
+            event: {
+              eventKey,
+              eventHash: toEventHashBuffer(eventKey),
+              merchantId: merchantObjectId,
+              carrier,
+              trackingNumber,
+              source: 'CARRIER_POLL',
+              rawStatus,
+              rawRemarks: update.rawRemarks || '',
+              occurredAt,
+              payload: update.payload || {},
+            },
+          });
+        } catch (applyErr: any) {
+          console.warn(`[TrackShipment] Failed to apply event for ${carrier}:${trackingNumber}:`, applyErr?.message);
+        }
+      }
+    }
 
     return {
       success: true,
@@ -616,8 +671,8 @@ export const executeWithBreaker = async <T>(
 
   try {
     const result = await operation();
-    // Record success upon completion
-    await recordSuccessService(carrier).catch((err) =>
+    // Record success upon completion (passing canary authorization status)
+    await recordSuccessService(carrier, permission.isCanary).catch((err) =>
       console.error(`Failed to record success for ${carrier}:`, err)
     );
     return result;

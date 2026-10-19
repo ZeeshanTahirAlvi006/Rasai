@@ -2,7 +2,7 @@ import { parse } from 'csv-parse';
 import { Types } from 'mongoose';
 import { ImportBatch } from './ImportBatch.model.js';
 import { ImportChunk, type IImportChunk } from './ImportChunk.model.js';
-import { getObjectStream, putGzippedNdjsonChunk, verifyUploadedObject } from '../config/s3.js';
+import { getObjectStream, putGzippedNdjsonChunk, verifyUploadedObject, deleteObject } from '../config/s3.js';
 import { getBulkImportQueue } from './importBatch.queue.js';
 import { AppError } from '../middleware/error.js';
 
@@ -175,6 +175,13 @@ export async function processNormalizeCsvStream(batchIdInput: string | Types.Obj
 
     // Flush any remaining rows
     await flushSlice();
+
+    // Source CSV is now safely sliced into chunk objects; free up S3 storage (ML-02)
+    if (batch.s3SourceKey) {
+      await deleteObject(batch.s3SourceKey).catch((err) => {
+        console.warn(`[ImportNormalizer] Failed to delete source S3 file ${batch.s3SourceKey}:`, err);
+      });
+    }
 
     const totalChunks = chunkIndex;
 

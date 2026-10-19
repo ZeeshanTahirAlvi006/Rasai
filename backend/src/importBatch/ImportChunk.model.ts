@@ -126,4 +126,14 @@ importChunkSchema.index(
   { name: 'idx_chunk_pump_claim' },
 );
 
+// 3. 30-day TTL index to clean up completed/failed chunk metadata
+importChunkSchema.index(
+  { completedAt: 1 },
+  {
+    expireAfterSeconds: 30 * 86400,
+    partialFilterExpression: { status: { $in: ['COMPLETED', 'FAILED'] } },
+    name: 'ttl_chunk_completed_30d',
+  },
+);
+
 export const ImportChunk = mongoose.model<IImportChunk>('ImportChunk', importChunkSchema);

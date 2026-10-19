@@ -74,6 +74,8 @@ export interface Coordinates {
 
 // -------- State machine types and interfaces -------
 export type Intent = | { kind: 'CARRIER_STATUS'; status: Status }
+  // Carrier scan with no state meaning (or an unmapped raw status): ledgered as NOOP
+  | { kind: 'INFORMATIONAL' }
   | { kind: 'CUSTOMER_RESCHEDULE'; date: Date; coordinates?: Coordinates }
   | { kind: 'CUSTOMER_CORRECTION' }
   | { kind: 'MERCHANT_CANCEL' };

@@ -115,13 +115,19 @@ const outboxMessageSchema = new Schema<IOutboxMessage>(
 // 1. Outbox deduplication: Prevents replayed transitions from creating a second message.
 outboxMessageSchema.index({ dedupeKey: 1 }, { unique: true, name: 'uniq_dedupe_key' });
 
-// 2. Relay claim query: find PENDING messages due now, or PROCESSING messages with expired leases.
+// 2. Expired lease reaper: find PROCESSING messages whose lease expired
 outboxMessageSchema.index(
-  { status: 1, scheduledFor: 1, leaseUntil: 1 },
-  { name: 'idx_outbox_relay_claim' },
+  { status: 1, leaseUntil: 1 },
+  { name: 'idx_outbox_lease_reap' },
 );
 
-// 3. High-throughput ESR claim index with tenant isolation & priority sorting
+// 3. High-throughput ESR claim index with priority sorting
+outboxMessageSchema.index(
+  { status: 1, priorityScore: -1, scheduledFor: 1 },
+  { name: 'idx_outbox_priority_claim' },
+);
+
+// 4. High-throughput ESR claim index with tenant isolation & priority sorting
 outboxMessageSchema.index(
   { status: 1, channel: 1, merchantId: 1, priorityScore: -1, scheduledFor: 1 },
   { name: 'idx_outbox_tenant_priority_claim' },

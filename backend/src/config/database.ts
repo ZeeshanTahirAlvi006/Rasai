@@ -6,8 +6,8 @@ const MAX_CONNECT_ATTEMPTS = 5;
 
 const options: mongoose.ConnectOptions = {
   appName: 'backend', // shows up in Mongo logs / Atlas profiler
-  maxPoolSize: 20,
-  minPoolSize: 2,
+  maxPoolSize: 100,
+  minPoolSize: 10,
   connectTimeoutMS: 10_000,
   serverSelectionTimeoutMS: 10_000, // fail fast instead of hanging
   socketTimeoutMS: 45_000,

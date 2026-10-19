@@ -4,9 +4,11 @@ import type { ConversationState, Coordinates } from '../types';
 
 export interface IConversationSession extends Document {
   _id: Types.ObjectId;
+  merchantId: Types.ObjectId;
   shipmentId: Types.ObjectId;
   customerPhoneHash: string;
   state: ConversationState;
+  stateVersion: number;
   draft: {
     date?: Date;
     coordinates?: Coordinates;
@@ -18,6 +20,12 @@ export interface IConversationSession extends Document {
 
 const conversationSessionSchema = new Schema<IConversationSession>(
   {
+    merchantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     shipmentId: {
       type: Schema.Types.ObjectId,
       required: true,
@@ -39,6 +47,11 @@ const conversationSessionSchema = new Schema<IConversationSession>(
         'EXPIRED',
       ],
       default: 'AWAITING_CHOICE',
+    },
+    stateVersion: {
+      type: Number,
+      required: true,
+      default: 0,
     },
     draft: {
       type: {
@@ -80,7 +93,19 @@ conversationSessionSchema.index(
   { name: 'idx_session_phone_state' },
 );
 
-// 2. Auto-expire stale sessions via MongoDB TTL index.
+// 2. Prevent concurrent active sessions for the same parcel
+conversationSessionSchema.index(
+  { shipmentId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      state: { $in: ['AWAITING_CHOICE', 'AWAITING_DATE', 'AWAITING_LOCATION', 'CONFIRMING'] },
+    },
+    name: 'uniq_active_session_shipment',
+  },
+);
+
+// 3. Auto-expire stale sessions via MongoDB TTL index.
 conversationSessionSchema.index(
   { expiresAt: 1 },
   { expireAfterSeconds: 0, name: 'idx_session_ttl' },

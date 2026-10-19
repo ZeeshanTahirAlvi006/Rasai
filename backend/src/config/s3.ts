@@ -8,8 +8,12 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import zlib from 'zlib';
+import util from 'util';
 import { config } from './index.js';
 import { AppError } from '../middleware/error.js';
+
+export const gzipAsync = util.promisify(zlib.gzip);
+export const gunzipAsync = util.promisify(zlib.gunzip);
 
 let s3ClientInstance: S3Client | null = null;
 
@@ -158,7 +162,7 @@ export async function putGzippedNdjsonChunk(
   lines: string[],
 ): Promise<{ key: string; sizeBytes: number }> {
   const rawBuffer = Buffer.from(lines.join('\n'), 'utf8');
-  const gzipped = zlib.gzipSync(rawBuffer);
+  const gzipped = await gzipAsync(rawBuffer);
 
   if (isTestEnv()) {
     inMemoryTestStore.set(key, {

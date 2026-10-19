@@ -8,7 +8,7 @@ import {
     type Intent,
     type Effect,
 } from '../types/index.js';
-import { computeEventKey } from './ShipmentEvent.utils.js';
+import { computeEventKey, parseCarrierTimestamp, normalizeCarrierStatus } from './ShipmentEvent.utils.js';
 import { ShipmentEvent, toEventHashBuffer } from './ShipmentEvent.model.js';
 import { Shipment } from '../shipment/shipment.model.js';
 import { ImportBatch } from '../importBatch/ImportBatch.model.js';
@@ -239,14 +239,11 @@ export const recordShipmentEventService = async (
 
     let occurredAt: Date;
     if (hasExplicitTimeStamp) {
-        occurredAt =
-            input.occurredAt instanceof Date
-                ? input.occurredAt
-                : new Date(input.occurredAt as string);
-
-        if (Number.isNaN(occurredAt.getTime())) {
+        const parsed = parseCarrierTimestamp(input.occurredAt);
+        if (!parsed) {
             throw new AppError(400, 'Invalid occurredAt timestamp', 'invalid_date');
         }
+        occurredAt = parsed;
     } else {
         occurredAt = new Date();
     }
@@ -279,11 +276,13 @@ export const recordShipmentEventService = async (
     });
 
     // Phase 3: Intent Resolution
-    const trimmedInputStatus = input.rawStatus?.trim();
-    const intent: Intent = input.intent ?? {
-        kind: 'CARRIER_STATUS',
-        status: (trimmedInputStatus as Status) || 'BOOKED',
-    };
+    let intent: Intent;
+    if (input.intent) {
+        intent = input.intent;
+    } else {
+        const normalized = normalizeCarrierStatus(rawStatus);
+        intent = normalized ? { kind: 'CARRIER_STATUS', status: normalized } : { kind: 'INFORMATIONAL' };
+    }
 
     // Phase 4: Transactional State Application (Serialized per Parcel Lane)
     const laneKey = `${merchantId.toString()}:${carrier}:${trackingNumber}`;
@@ -468,12 +467,8 @@ export const bulkRecordShipmentEventsService = async (
 
         let occurredAt: Date;
         if (hasExplicitTimeStamp) {
-            occurredAt =
-                row.occurredAt instanceof Date
-                    ? row.occurredAt
-                    : new Date(row.occurredAt as string);
-
-            if (Number.isNaN(occurredAt.getTime())) {
+            const parsed = parseCarrierTimestamp(row.occurredAt);
+            if (!parsed) {
                 results[i] = {
                     index: originalIndex,
                     trackingNumber,
@@ -485,6 +480,7 @@ export const bulkRecordShipmentEventsService = async (
                 };
                 continue;
             }
+            occurredAt = parsed;
         } else {
             occurredAt = new Date();
         }
@@ -504,10 +500,13 @@ export const bulkRecordShipmentEventsService = async (
             carrierEventId,
         });
         // set the intent of the event
-        const intent: Intent = row.intent ?? {
-            kind: 'CARRIER_STATUS',
-            status: (rawStatus as Status) || 'BOOKED',
-        };
+        let intent: Intent;
+        if (row.intent) {
+            intent = row.intent;
+        } else {
+            const normalized = normalizeCarrierStatus(rawStatus);
+            intent = normalized ? { kind: 'CARRIER_STATUS', status: normalized } : { kind: 'INFORMATIONAL' };
+        }
         // set the source of the event
         const source = row.source || 'FILE_IMPORT';
         // add the row to valid rows
@@ -527,14 +526,14 @@ export const bulkRecordShipmentEventsService = async (
         validEventKeysSet.add(eventKey);
     }
 
-    // Phase 3: Upfront Batch Deduplication Check
+    // Phase 3: Upfront Batch Deduplication Check via indexed eventHash
 
-    //fetch existing event keys and mark duplicates
+    const validHashes = Array.from(validEventKeysSet).map((k) => toEventHashBuffer(k));
     const existingDocs =
-        validEventKeysSet.size > 0
+        validHashes.length > 0
             ? await ShipmentEvent.find({
                 merchantId,
-                eventKey: { $in: Array.from(validEventKeysSet) },
+                eventHash: { $in: validHashes },
             })
                 .select('eventKey')
                 .lean()
@@ -594,6 +593,7 @@ export const bulkRecordShipmentEventsService = async (
                         intent: row.intent,
                         event: {
                             eventKey: row.eventKey,
+                            eventHash: toEventHashBuffer(row.eventKey),
                             merchantId,
                             carrier: row.carrier,
                             trackingNumber: row.trackingNumber,
@@ -735,13 +735,7 @@ export const listShipmentEventsService = async (
 ): Promise<ServiceResponse<ListShipmentEventsResult>> => {
     // Phase 1: Input Validation & Sanitization
     if (!merchantIdInput || !Types.ObjectId.isValid(merchantIdInput)) {
-        return {
-            success: false,
-            status: 400,
-            message: 'Invalid merchant id',
-            data: { events: [], totalReturned: 0 },
-            error: 'invalid_merchant_id',
-        };
+        throw new AppError(400, 'Invalid merchant id', 'invalid_merchant_id');
     }
     const merchantId =
         merchantIdInput instanceof Types.ObjectId
@@ -759,13 +753,7 @@ export const listShipmentEventsService = async (
     if (filter.carrier) {
         const carrier = filter.carrier.trim() as Carrier;
         if (!CARRIERS.includes(carrier)) {
-            return {
-                success: false,
-                status: 400,
-                message: `Invalid carrier '${carrier}'. Supported: ${CARRIERS.join(', ')}`,
-                data: { events: [], totalReturned: 0 },
-                error: 'invalid_carrier',
-            };
+            throw new AppError(400, `Invalid carrier '${carrier}'. Supported: ${CARRIERS.join(', ')}`, 'invalid_carrier');
         }
         query.carrier = carrier;
     }
@@ -794,13 +782,7 @@ export const listShipmentEventsService = async (
         if (filter.startDate) {
             const res = parseDateBoundary(filter.startDate, false);
             if (res.error || !res.date) {
-                return {
-                    success: false,
-                    status: 400,
-                    message: res.error || 'Invalid startDate timestamp',
-                    data: { events: [], totalReturned: 0 },
-                    error: 'invalid_date',
-                };
+                throw new AppError(400, res.error || 'Invalid startDate timestamp', 'invalid_date');
             }
             parsedStart = res.date;
             dateQuery.$gte = res.date;
@@ -809,26 +791,14 @@ export const listShipmentEventsService = async (
         if (filter.endDate) {
             const res = parseDateBoundary(filter.endDate, true);
             if (res.error || !res.date) {
-                return {
-                    success: false,
-                    status: 400,
-                    message: res.error || 'Invalid endDate timestamp',
-                    data: { events: [], totalReturned: 0 },
-                    error: 'invalid_date',
-                };
+                throw new AppError(400, res.error || 'Invalid endDate timestamp', 'invalid_date');
             }
             parsedEnd = res.date;
             dateQuery.$lte = res.date;
         }
 
         if (parsedStart && parsedEnd && parsedStart > parsedEnd) {
-            return {
-                success: false,
-                status: 400,
-                message: 'startDate cannot be after endDate',
-                data: { events: [], totalReturned: 0 },
-                error: 'invalid_date_range',
-            };
+            throw new AppError(400, 'startDate cannot be after endDate', 'invalid_date_range');
         }
 
         query.occurredAt = dateQuery;
@@ -883,13 +853,7 @@ export const getShipmentTimelineService = async (
 ): Promise<ServiceResponse<ShipmentTimeLineResult>> => {
     // Phase 1: Input Validation & Sanitization
     if (!merchantIdInput || !Types.ObjectId.isValid(merchantIdInput)) {
-        return {
-            success: false,
-            status: 400,
-            message: 'Invalid merchant id',
-            data: {} as ShipmentTimeLineResult,
-            error: 'invalid_merchant_id',
-        };
+        throw new AppError(400, 'Invalid merchant id', 'invalid_merchant_id');
     }
     const merchantId =
         merchantIdInput instanceof Types.ObjectId
@@ -898,24 +862,12 @@ export const getShipmentTimelineService = async (
 
     const carrier = carrierInput?.trim() as Carrier;
     if (!carrier || !CARRIERS.includes(carrier)) {
-        return {
-            success: false,
-            status: 400,
-            message: `Invalid carrier '${carrierInput}'. Supported: ${CARRIERS.join(', ')}`,
-            data: {} as ShipmentTimeLineResult,
-            error: 'invalid_carrier',
-        };
+        throw new AppError(400, `Invalid carrier '${carrierInput}'. Supported: ${CARRIERS.join(', ')}`, 'invalid_carrier');
     }
 
     const trackingNumber = trackingNumberInput?.trim();
     if (!trackingNumber) {
-        return {
-            success: false,
-            status: 400,
-            message: 'Tracking number is required',
-            data: {} as ShipmentTimeLineResult,
-            error: 'missing_tracking_number',
-        };
+        throw new AppError(400, 'Tracking number is required', 'missing_tracking_number');
     }
 
     // Phase 2: Execute query strictly scope to the merchant
@@ -940,13 +892,7 @@ export const getShipmentTimelineService = async (
         .exec();
     // return if no shipment or event found
     if (!shipment && events.length === 0) {
-        return {
-            success: false,
-            status: 404,
-            message: `Shipment not found for tracking number '${trackingNumber}'`,
-            data: {} as ShipmentTimeLineResult,
-            error: 'shipment_not_found',
-        };
+        throw new AppError(404, `Shipment not found for tracking number '${trackingNumber}'`, 'shipment_not_found');
     }
 
     // Phase 3: Clean and Present the output
@@ -986,13 +932,7 @@ export const getLedgerMetricsService = async (
 ): Promise<ServiceResponse<LedgerMetricsResult>> => {
     // Phase 1: Input Validation & Build the filter
     if (!merchantIdInput || !Types.ObjectId.isValid(merchantIdInput)) {
-        return {
-            success: false,
-            status: 400,
-            message: 'Invalid merchant id',
-            data: createEmptyLedgerMetricsResult(),
-            error: 'invalid_merchant_id',
-        };
+        throw new AppError(400, 'Invalid merchant id', 'invalid_merchant_id');
     }
     const merchantId =
         merchantIdInput instanceof Types.ObjectId
@@ -1004,13 +944,7 @@ export const getLedgerMetricsService = async (
     if (filter.carrier) {
         const carrier = filter.carrier.trim() as Carrier;
         if (!CARRIERS.includes(carrier)) {
-            return {
-                success: false,
-                status: 400,
-                message: `Invalid carrier '${carrier}'. Supported: ${CARRIERS.join(', ')}`,
-                data: createEmptyLedgerMetricsResult(),
-                error: 'invalid_carrier',
-            };
+            throw new AppError(400, `Invalid carrier '${carrier}'. Supported: ${CARRIERS.join(', ')}`, 'invalid_carrier');
         }
         match.carrier = carrier;
     }
@@ -1023,13 +957,7 @@ export const getLedgerMetricsService = async (
         if (filter.startDate) {
             const res = parseDateBoundary(filter.startDate, false);
             if (res.error || !res.date) {
-                return {
-                    success: false,
-                    status: 400,
-                    message: res.error || 'Invalid startDate timestamp',
-                    data: createEmptyLedgerMetricsResult(),
-                    error: 'invalid_date',
-                };
+                throw new AppError(400, res.error || 'Invalid startDate timestamp', 'invalid_date');
             }
             parsedStartDate = res.date;
             dateMatch.$gte = res.date;
@@ -1038,26 +966,14 @@ export const getLedgerMetricsService = async (
         if (filter.endDate) {
             const res = parseDateBoundary(filter.endDate, true);
             if (res.error || !res.date) {
-                return {
-                    success: false,
-                    status: 400,
-                    message: res.error || 'Invalid endDate timestamp',
-                    data: createEmptyLedgerMetricsResult(),
-                    error: 'invalid_date',
-                };
+                throw new AppError(400, res.error || 'Invalid endDate timestamp', 'invalid_date');
             }
             parsedEndDate = res.date;
             dateMatch.$lte = res.date;
         }
 
         if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
-            return {
-                success: false,
-                status: 400,
-                message: 'startDate cannot be after endDate',
-                data: createEmptyLedgerMetricsResult({ startDate: parsedStartDate, endDate: parsedEndDate }),
-                error: 'invalid_date_range',
-            };
+            throw new AppError(400, 'startDate cannot be after endDate', 'invalid_date_range');
         }
 
         match.occurredAt = dateMatch;
@@ -1068,20 +984,16 @@ export const getLedgerMetricsService = async (
         match.occurredAt = { $gte: parsedStartDate, $lte: parsedEndDate };
     }
 
-    // Phase 2: Three mini-pipelines to calculate metrics in one database call
-    const [aggregationResult] = await ShipmentEvent.aggregate([
+    // Phase 2: Single-pass aggregation grouping by disposition and source (BN-05)
+    const rows = await ShipmentEvent.aggregate([
         { $match: match },
         {
-            $facet: {
-                byDisposition: [
-                    { $group: { _id: '$disposition', count: { $sum: 1 } } },
-                ],
-                bySource: [
-                    { $group: { _id: '$source', count: { $sum: 1 } } },
-                ],
-                total: [
-                    { $count: 'count' },
-                ],
+            $group: {
+                _id: {
+                    disposition: '$disposition',
+                    source: '$source',
+                },
+                count: { $sum: 1 },
             },
         },
     ]).exec();
@@ -1100,11 +1012,6 @@ export const getLedgerMetricsService = async (
         return acc;
     }, {} as Record<Disposition, number> & Record<string, number>);
 
-    for (const item of aggregationResult?.byDisposition ?? []) {
-        const key = item._id ? String(item._id) : 'UNKNOWN';
-        byDisposition[key] = (byDisposition[key] ?? 0) + item.count;
-    }
-
     const allSources: EventSource[] = [
         'CARRIER_POLL',
         'CARRIER_WEBHOOK',
@@ -1117,12 +1024,15 @@ export const getLedgerMetricsService = async (
         return acc;
     }, {} as Record<EventSource, number> & Record<string, number>);
 
-    for (const item of aggregationResult?.bySource ?? []) {
-        const key = item._id ? String(item._id) : 'UNKNOWN';
-        bySource[key] = (bySource[key] ?? 0) + item.count;
+    let totalEvents = 0;
+    for (const item of rows ?? []) {
+        const count = typeof item.count === 'number' ? item.count : 0;
+        totalEvents += count;
+        const d = item._id?.disposition ? String(item._id.disposition) : 'UNKNOWN';
+        const s = item._id?.source ? String(item._id.source) : 'UNKNOWN';
+        byDisposition[d] = (byDisposition[d] ?? 0) + count;
+        bySource[s] = (bySource[s] ?? 0) + count;
     }
-
-    const totalEvents = aggregationResult?.total?.[0]?.count ?? 0;
 
     return {
         success: true,

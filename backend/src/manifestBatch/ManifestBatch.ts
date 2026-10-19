@@ -5,8 +5,10 @@ export interface IManifestBatch extends Document {
   dateKey: string; // YYYY-MM-DD in Asia/Karachi
   stationCode: string;
   status: 'STARTED' | 'SENT' | 'FAILED';
+  leaseUntil?: Date;
   driveUrl?: string;
   sentAt?: Date;
+  error?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,12 +29,20 @@ const manifestBatchSchema = new Schema<IManifestBatch>(
       enum: ['STARTED', 'SENT', 'FAILED'],
       default: 'STARTED',
     },
+    leaseUntil: {
+      type: Date,
+      default: undefined,
+    },
     driveUrl: {
       type: String,
       default: undefined,
     },
     sentAt: {
       type: Date,
+      default: undefined,
+    },
+    error: {
+      type: String,
       default: undefined,
     },
   },

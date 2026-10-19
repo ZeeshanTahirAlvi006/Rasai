@@ -1,13 +1,8 @@
-import crypto from 'crypto';
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { Carrier, EventSource, Disposition } from '../types/index.js';
+import { eventKeyToHash } from '../utils/eventKey.js';
 
-export function toEventHashBuffer(eventKey: string): Buffer {
-  if (typeof eventKey === 'string' && /^[0-9a-fA-F]{64}$/.test(eventKey.trim())) {
-    return Buffer.from(eventKey.trim(), 'hex').subarray(0, 16);
-  }
-  return crypto.createHash('sha256').update(String(eventKey || '')).digest().subarray(0, 16);
-}
+export const toEventHashBuffer = (eventKey: string): Buffer => eventKeyToHash(eventKey);
 
 export interface IShipmentEvent extends Document {
   _id: Types.ObjectId;
@@ -111,6 +106,12 @@ shipmentEventSchema.index(
   { unique: true, name: 'uniq_parcel_localized_event_hash' },
 );
 
+// 2. Batch dedupe lookups: `{ merchantId, eventHash: { $in } }` (eventKey itself is not indexed)
+shipmentEventSchema.index(
+  { merchantId: 1, eventHash: 1 },
+  { name: 'idx_merchant_event_hash' },
+);
+
 // 3. Ledger telemetry metrics & date-range aggregations
 shipmentEventSchema.index(
   { merchantId: 1, occurredAt: -1 },
@@ -121,6 +122,14 @@ shipmentEventSchema.index(
 shipmentEventSchema.index(
   { merchantId: 1, carrier: 1, occurredAt: -1 },
   { name: 'idx_merchant_carrier_occurred' },
+);
+
+export const LEDGER_RETENTION_SECONDS = 90 * 86400;
+
+// 5. Hot retention window: ledger rows expire 90 days after insert
+shipmentEventSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: LEDGER_RETENTION_SECONDS, name: 'ttl_ledger_90d' },
 );
 
 export const ShipmentEvent = mongoose.model<IShipmentEvent>('ShipmentEvent', shipmentEventSchema);

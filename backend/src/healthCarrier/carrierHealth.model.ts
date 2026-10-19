@@ -8,7 +8,7 @@ export type CarrierHealthDoc = HydratedDocument<CarrierHealth>
 interface ICarrierHealthModel extends Model<CarrierHealth> {
   claimCanary(carrier: Carrier, canaryTimeOutMs?: number): Promise<CarrierHealthDoc | null>;
   recordFailure(carrier: Carrier, threshold: number, baseBackOffMs: number, errorCode?: string): Promise<CarrierHealthDoc | null>;
-  recordSuccess(carrier: Carrier): Promise<CarrierHealthDoc | null>
+  recordSuccess(carrier: Carrier, isCanary?: boolean): Promise<CarrierHealthDoc | null>;
 }
 
 const carrierHealthSchema = new Schema({
@@ -67,13 +67,15 @@ carrierHealthSchema.statics.claimCanary = function (carrier: Carrier, canaryTime
   const now = new Date();
   return this.findOneAndUpdate(
     {
-      carrier, $or: [{ state: "OPEN", backOffUntil: { $lte: now } }, {
-        state: "HALF_OPEN", lastCanaryAt: { $lte: new Date(now.getTime() - canaryTimeOutMs) }
-      }]
+      carrier,
+      $or: [
+        { state: 'OPEN', backOffUntil: { $lte: now } },
+        { state: 'HALF_OPEN', lastCanaryAt: { $lte: new Date(now.getTime() - canaryTimeOutMs) } },
+      ],
     },
-    { $set: { state: "HALF_OPEN", lastCanaryAt: now } },
-    { returnDocument: 'after' }
-  )
+    { $set: { state: 'HALF_OPEN', failureCount: 0, lastCanaryAt: now } },
+    { returnDocument: 'after' },
+  );
 };
 
 carrierHealthSchema.statics.recordFailure = async function (
@@ -95,7 +97,12 @@ carrierHealthSchema.statics.recordFailure = async function (
     return (await this.findOneAndUpdate(
       { carrier, state: doc.state },
       {
-        $set: { state: "OPEN", lastTrippedAt: now, backOffUntil: new Date(now.getTime() + backoff) },
+        $set: {
+          state: "OPEN",
+          failureCount: 0,
+          lastTrippedAt: now,
+          backOffUntil: new Date(now.getTime() + backoff),
+        },
         $inc: { tripCount: 1 }
       },
       { returnDocument: "after" }
@@ -104,14 +111,19 @@ carrierHealthSchema.statics.recordFailure = async function (
   return doc;
 };
 
-carrierHealthSchema.statics.recordSuccess = async function (carrier: Carrier) {
+carrierHealthSchema.statics.recordSuccess = async function (carrier: Carrier, isCanary = false) {
+  const filter: Record<string, unknown> = { carrier, state: { $ne: 'OPEN' } };
+  if (!isCanary) {
+    // Non-canary calls cannot transition a HALF_OPEN breaker to CLOSED (RC-06)
+    filter.state = 'CLOSED';
+  }
   return this.findOneAndUpdate(
-    { carrier, state: { $ne: "OPEN" } },
+    filter,
     {
-      $set: { state: "CLOSED", failureCount: 0, lastSuccessAt: new Date() },
-      $unset: { backOffUntil: "", lastCanaryAt: "" }
+      $set: { state: 'CLOSED', failureCount: 0, lastSuccessAt: new Date() },
+      $unset: { backOffUntil: '', lastCanaryAt: '' }
     },
-    { returnDocument: "after", upsert: true }
+    { returnDocument: 'after', upsert: !isCanary }
   );
 };
 

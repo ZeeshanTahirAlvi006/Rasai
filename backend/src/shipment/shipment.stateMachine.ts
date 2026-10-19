@@ -111,6 +111,9 @@ export function decide(
       return { next: target, effects, disposition: 'APPLIED' };
     }
 
+    case 'INFORMATIONAL':
+      return noop;
+
     case 'CUSTOMER_RESCHEDULE': {
       if (isTerminal(current)) return noop;
       if (current === 'NDR_ACTIVE' || current === 'RESOLVED_RESCHEDULED') {

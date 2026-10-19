@@ -66,6 +66,14 @@ export function getRedisClient(): IORedis {
   return sharedRedisClient;
 }
 
-// ── Graceful shutdown (call from your SIGTERM/SIGINT handler) ─
-// await connection.quit();   // waits for pending commands, unlike .disconnect()
+export async function closeSharedRedisClient(): Promise<void> {
+  if (sharedRedisClient) {
+    try {
+      await sharedRedisClient.quit();
+    } catch {
+      sharedRedisClient.disconnect();
+    }
+    sharedRedisClient = null;
+  }
+}
 

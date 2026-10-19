@@ -1,14 +1,13 @@
-import zlib from 'zlib';
 import { Types } from 'mongoose';
 import { ImportBatch } from './ImportBatch.model.js';
 import { ImportChunk, type IImportChunk } from './ImportChunk.model.js';
 import { Shipment, type IShipment } from '../shipment/shipment.model.js';
 import { ShipmentEvent, toEventHashBuffer } from '../shipmentEvent/ShipmentEvent.model.js';
 import { OutboxMessage } from '../models/OutboxMessage.js';
-import { computeEventKey } from '../shipmentEvent/ShipmentEvent.utils.js';
+import { computeEventKey, parseCarrierTimestamp, normalizeCarrierStatus } from '../utils/eventKey.js';
 import { decide } from '../shipment/shipment.stateMachine.js';
 import { applyEventDetailed } from '../engine/applyEvent.js';
-import { getObjectStream } from '../config/s3.js';
+import { getObjectStream, deleteObject, gunzipAsync } from '../config/s3.js';
 import { withMerchantBulkLease } from '../utils/bulkSemaphore.js';
 import { enqueueChunkJob, type NormalizedCsvRow } from './importBatch.normalizer.js';
 import { AppError } from '../middleware/error.js';
@@ -34,10 +33,16 @@ interface MutatedParcelPlan {
   finalSetFields: Record<string, any>;
   winningEventRows: any[];
   outboxOps: any[];
+  counts: {
+    applied: number;
+    noop: number;
+    duplicates: number;
+    rejected: number;
+  };
 }
 
 /**
- * Reads gunzipped lines from an S3 object key
+ * Reads gunzipped lines from an S3 object key asynchronously (BN-06)
  */
 async function readGunzippedNdjsonLines(s3Key: string): Promise<string[]> {
   const stream = await getObjectStream(s3Key);
@@ -48,7 +53,7 @@ async function readGunzippedNdjsonLines(s3Key: string): Promise<string[]> {
   }
 
   const fullBuffer = Buffer.concat(chunks);
-  const unzipped = zlib.gunzipSync(fullBuffer);
+  const unzipped = await gunzipAsync(fullBuffer);
   return unzipped
     .toString('utf8')
     .split('\n')
@@ -76,39 +81,48 @@ export async function processImportChunk(chunkIdInput: string | Types.ObjectId):
   const carrier = chunk.carrier;
   const batchId = chunk.batchId;
 
-  // 1. Acquire leased semaphore for this merchant across all batches
-  const leaseResult = await withMerchantBulkLease(
-    merchantId.toString(),
-    chunk._id.toString(),
-    async () => {
-      await ImportChunk.updateOne({ _id: chunk._id }, { $set: { status: 'PROCESSING' } });
-      return await executeVectorizedChunkWork(chunk);
-    },
-    { maxConcurrent: 2, leaseDurationMs: 30000, heartbeatIntervalMs: 10000 },
-  );
+  let leaseAcquired = false;
 
-  if (!leaseResult.acquired) {
-    // Merchant has reached concurrency cap across active batches: delay execution
-    throw new AppError(
-      429,
-      `Tenant concurrency cap reached for merchant ${merchantId}`,
-      'bulk_tenant_throttled',
-    );
-  }
-
-  // 2. Self-pumping: claim and enqueue the next PENDING chunk for this batch
   try {
-    const nextChunk = await ImportChunk.findOneAndUpdate(
-      { batchId: chunk.batchId, status: 'PENDING' },
-      { $set: { status: 'QUEUED' } },
-      { sort: { chunkIndex: 1 }, new: true },
-    ).exec();
+    // 1. Acquire leased semaphore for this merchant across all batches
+    const leaseResult = await withMerchantBulkLease(
+      merchantId.toString(),
+      chunk._id.toString(),
+      async () => {
+        await ImportChunk.updateOne({ _id: chunk._id }, { $set: { status: 'PROCESSING' } });
+        return await executeVectorizedChunkWork(chunk);
+      },
+      { maxConcurrent: 2, leaseDurationMs: 30000, heartbeatIntervalMs: 10000 },
+    );
 
-    if (nextChunk) {
-      await enqueueChunkJob(nextChunk);
+    leaseAcquired = leaseResult.acquired;
+
+    if (!leaseAcquired) {
+      // Merchant has reached concurrency cap across active batches: delay execution
+      throw new AppError(
+        429,
+        `Tenant concurrency cap reached for merchant ${merchantId}`,
+        'bulk_tenant_throttled',
+      );
     }
-  } catch (err: any) {
-    console.warn(`[BulkWorker] Failed to pump next chunk for batch ${batchId}:`, err?.message);
+  } finally {
+    // 2. Self-pumping in finally block: claim and enqueue the next PENDING chunk for this batch
+    // Only attempt to pump if this execution completed its slot (not rejected at semaphore entrance)
+    if (leaseAcquired) {
+      try {
+        const nextChunk = await ImportChunk.findOneAndUpdate(
+          { batchId: chunk.batchId, status: 'PENDING' },
+          { $set: { status: 'QUEUED' } },
+          { sort: { chunkIndex: 1 }, new: true },
+        ).exec();
+
+        if (nextChunk) {
+          await enqueueChunkJob(nextChunk);
+        }
+      } catch (err: any) {
+        console.warn(`[BulkWorker] Failed to pump next chunk for batch ${batchId}:`, err?.message);
+      }
+    }
   }
 }
 
@@ -159,12 +173,13 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
 
     let occurredAt: Date;
     if (row.occurredAt) {
-      occurredAt = new Date(row.occurredAt);
-      if (Number.isNaN(occurredAt.getTime())) {
+      const parsed = parseCarrierTimestamp(row.occurredAt);
+      if (!parsed) {
         rejectedCount++;
         errorsToLog.push({ row: row.rowNumber, trackingNumber: trk, reason: 'Invalid occurredAt date' });
         continue;
       }
+      occurredAt = parsed;
     } else {
       occurredAt = new Date();
     }
@@ -200,10 +215,10 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
     }
     inChunkSeenKeys.add(eventKey);
 
-    const intent: Intent = {
-      kind: 'CARRIER_STATUS',
-      status: (rawStatus as Status) || 'BOOKED',
-    };
+    const normalized = normalizeCarrierStatus(rawStatus);
+    const intent: Intent = normalized
+      ? { kind: 'CARRIER_STATUS', status: normalized }
+      : { kind: 'INFORMATIONAL' };
 
     validRows.push({
       rowNumber: row.rowNumber,
@@ -222,11 +237,12 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
     candidateTrackingNumbers.add(trk);
   }
 
-  // Step 3: Op 1 — Upfront Vectorized Deduplication Check against Ledger
+  // Step 3: Op 1 — Upfront Vectorized Deduplication Check against Ledger via indexed eventHash (BN-01)
+  const candidateHashes = Array.from(candidateKeys).map((k) => toEventHashBuffer(k));
   const existingLedgerDocs =
-    candidateKeys.size > 0
+    candidateHashes.length > 0
       ? await ShipmentEvent.find(
-          { merchantId, eventKey: { $in: Array.from(candidateKeys) } },
+          { merchantId, eventHash: { $in: candidateHashes } },
           { eventKey: 1, _id: 0 },
         )
           .lean()
@@ -322,6 +338,12 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
       enqueueCorrectionAttempt: null as number | null,
     };
 
+    const parcelCounts = {
+      applied: 0,
+      noop: 0,
+      duplicates: 0,
+      rejected: 0,
+    };
     const parcelEventDocs: any[] = [];
     let parcelHasApplied = false;
 
@@ -343,7 +365,7 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
 
       if (decision.disposition === 'APPLIED') {
         parcelHasApplied = true;
-        appliedCount++;
+        parcelCounts.applied++;
 
         const prevStatus = sim.status;
         sim.status = decision.next;
@@ -381,11 +403,11 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
           netOutbox.enqueueCorrectionAttempt = sim.ndrAttempt;
         }
       } else if (decision.disposition === 'NOOP') {
-        noopCount++;
+        parcelCounts.noop++;
       } else if (decision.disposition === 'DUPLICATE') {
-        duplicatesCount++;
+        parcelCounts.duplicates++;
       } else {
-        rejectedCount++;
+        parcelCounts.rejected++;
       }
 
       parcelEventDocs.push({
@@ -444,8 +466,6 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
             $setOnInsert: {
               merchantId: currentShipment.merchantId,
               shipmentId: currentShipment._id,
-              recipientPhone: currentShipment.customerPhone,
-              recipientPhoneHash: currentShipment.customerPhoneHash,
               dedupeKey,
               channel: 'META_WHATSAPP',
               messageType: msgType,
@@ -495,18 +515,25 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
         finalSetFields: finalSet,
         winningEventRows: parcelEventDocs,
         outboxOps: parcelOutboxOps,
+        counts: parcelCounts,
       });
     } else {
       winningShipmentEvents.push(...parcelEventDocs);
+      appliedCount += parcelCounts.applied;
+      noopCount += parcelCounts.noop;
+      duplicatesCount += parcelCounts.duplicates;
+      rejectedCount += parcelCounts.rejected;
     }
   }
 
-  // Step 6: Op 3 — Version-Guarded Shipment.bulkWrite FIRST (Race Detection)
+  // Step 6: Op 3 — Version-Guarded Shipment.bulkWrite FIRST (Race Detection with chunkToken, RC-01)
+  const chunkToken = new Types.ObjectId();
   const shipmentBulkOps = mutatedParcels.map((p) => ({
     updateOne: {
       filter: { _id: p.shipmentId, stateVersion: p.initialStateVersion },
       update: {
         $set: p.finalSetFields,
+        $push: { bulkApplyTokens: { $each: [chunkToken], $slice: -10 } },
         $inc: { stateVersion: 1 },
       },
     },
@@ -517,21 +544,17 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
   if (shipmentBulkOps.length > 0) {
     const shipmentWriteRes = await Shipment.bulkWrite(shipmentBulkOps, { ordered: false });
 
-    // Race detection: if matchedCount < expected, diff stateVersion to isolate conflicted parcels
+    // Race detection: if matchedCount < expected, isolate winning vs conflicted parcels via chunkToken
     if (shipmentWriteRes.matchedCount < mutatedParcels.length) {
       const mutatedIds = mutatedParcels.map((p) => p.shipmentId);
-      const freshShipments = await Shipment.find(
-        { _id: { $in: mutatedIds } },
-        { _id: 1, stateVersion: 1 },
+      const winningDocs = await Shipment.find(
+        { _id: { $in: mutatedIds }, bulkApplyTokens: chunkToken },
+        { _id: 1 },
       ).lean();
-      const freshVersionMap = new Map<string, number>(
-        freshShipments.map((s: any) => [s._id.toString(), s.stateVersion]),
-      );
+      const winningSet = new Set<string>(winningDocs.map((d: any) => d._id.toString()));
 
       for (const p of mutatedParcels) {
-        const expectedVersion = p.initialStateVersion + 1;
-        const actualVersion = freshVersionMap.get(p.shipmentId.toString());
-        if (actualVersion !== expectedVersion) {
+        if (!winningSet.has(p.shipmentId.toString())) {
           conflictedShipmentIds.add(p.shipmentId.toString());
         }
       }
@@ -580,6 +603,10 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
     } else {
       winningShipmentEvents.push(...p.winningEventRows);
       winningOutboxOps.push(...p.outboxOps);
+      appliedCount += p.counts.applied;
+      noopCount += p.counts.noop;
+      duplicatesCount += p.counts.duplicates;
+      rejectedCount += p.counts.rejected;
     }
   }
 
@@ -616,6 +643,13 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
       },
     },
   );
+
+  // Free S3 chunk storage once completed (ML-02)
+  if (chunk.s3ChunkKey) {
+    await deleteObject(chunk.s3ChunkKey).catch((err) => {
+      console.warn(`[BulkWorker] Failed to delete chunk S3 key ${chunk.s3ChunkKey}:`, err);
+    });
+  }
 
   // Prevent double-counting on worker retry
   if (chunkTransition.modifiedCount === 1) {

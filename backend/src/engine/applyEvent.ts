@@ -84,6 +84,7 @@ export async function applyEventDetailed(cmd: ApplyEventCommand): Promise<ApplyE
                 readConcern: { level: 'snapshot' },
                 writeConcern: { w: 'majority' },
                 readPreference: 'primary',
+                maxCommitTimeMS: 5000,
             });
 
             const result = await applyInTransaction(cmd, session);
@@ -266,10 +267,13 @@ async function applyInTransaction(
         }
         : decide(current.status, intent, { ndrTemplateSent });
 
+    const eventDocId = new Types.ObjectId();
+
     // Ledger insert is first write. E11000 here indicates duplicate event key.
     await ShipmentEvent.create(
         [
             {
+                _id: eventDocId,
                 ...event,
                 eventHash,
                 shipmentId: current._id,
@@ -335,7 +339,7 @@ async function applyInTransaction(
 
     if (updateRes.matchedCount === 0) {
         if (!session) {
-            await ShipmentEvent.deleteOne({ eventKey: event.eventKey }).catch(() => {});
+            await ShipmentEvent.deleteOne({ _id: eventDocId, merchantId: merchantObjectId }).catch(() => {});
         }
         throw new ConcurrencyConflict(`Version conflict on shipment ${trackingNumber}`);
     }
@@ -366,7 +370,7 @@ async function applyInTransaction(
         await enqueueOutbox(
             current,
             'RTO_NOTICE',
-            `${current._id}:RTO_NOTICE`,
+            `${current._id}:RTO_NOTICE:${nextAttempt}`,
             session,
         );
     }
@@ -399,7 +403,8 @@ async function enqueueOutbox(
     const now = new Date();
 
     // Single atomic upsert: reactivates DISCARDED_STALE or inserts PENDING message
-    // If already DISPATCHED, the filter status != 'DISPATCHED' avoids overwrite
+    // If already DISPATCHED, the filter status != 'DISPATCHED' avoids overwrite.
+    // PII (recipientPhone) is not duplicated in OutboxMessage; send worker reads from Shipment.
     await OutboxMessage.updateOne(
         { dedupeKey, status: { $ne: 'DISPATCHED' } },
         {
@@ -411,8 +416,6 @@ async function enqueueOutbox(
             $setOnInsert: {
                 merchantId: shipment.merchantId,
                 shipmentId: shipment._id,
-                recipientPhone: shipment.customerPhone,
-                recipientPhoneHash: shipment.customerPhoneHash,
                 dedupeKey,
                 channel: 'META_WHATSAPP',
                 messageType,

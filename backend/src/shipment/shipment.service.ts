@@ -490,20 +490,54 @@ export async function cancelShipmentService(
 
 // ---------------- Internal operational and engine helpers ----------
 
-// Selects shipments due for a status poll using index idx_poller_selection.
+// Selects shipments due for a status poll using index idx_poller_carrier_selection or idx_poller_selection.
+export async function selectDueForPoll(
+  carrier: Carrier,
+  status: Status,
+  olderThan: Date,
+  limit?: number,
+): Promise<IShipment[]>;
 export async function selectDueForPoll(
   status: Status,
   olderThan: Date,
-  limit = 100,
+  limit?: number,
+): Promise<IShipment[]>;
+export async function selectDueForPoll(
+  arg1: Carrier | Status,
+  arg2: Status | Date,
+  arg3?: Date | number,
+  arg4 = 100,
 ): Promise<IShipment[]> {
-  return Shipment.find({
-    status,
-    $or: [
-      { lastPolledAt: { $lt: olderThan } },
-      { lastPolledAt: null },
-      { lastPolledAt: { $exists: false } },
-    ],
-  })
+  let query: Record<string, unknown>;
+  let limit = 100;
+
+  if (typeof arg2 === 'string') {
+    const carrier = arg1 as Carrier;
+    const status = arg2 as Status;
+    const olderThan = (arg3 as Date) || new Date();
+    limit = typeof arg4 === 'number' ? arg4 : 100;
+    query = {
+      carrier,
+      status,
+      $or: [
+        { lastPolledAt: { $lt: olderThan } },
+        { lastPolledAt: null },
+      ],
+    };
+  } else {
+    const status = arg1 as Status;
+    const olderThan = (arg2 as Date) || new Date();
+    limit = typeof arg3 === 'number' ? arg3 : 100;
+    query = {
+      status,
+      $or: [
+        { lastPolledAt: { $lt: olderThan } },
+        { lastPolledAt: null },
+      ],
+    };
+  }
+
+  return Shipment.find(query)
     .sort({ lastPolledAt: 1 })
     .limit(limit)
     .lean<IShipment[]>()

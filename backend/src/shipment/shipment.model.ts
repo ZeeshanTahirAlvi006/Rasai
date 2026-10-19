@@ -26,6 +26,9 @@ export interface IShipment extends Document {
   callLogAttempts: number;
   trackingHealth: TrackingHealth;
   lastPolledAt?: Date;
+  // Last few vectorized-import write tokens; lets a bulk worker identify exactly which
+  // of its version-guarded updates won, even if other writers touch the doc afterwards.
+  bulkApplyTokens?: Types.ObjectId[];
   updatedAt: Date;
 }
 
@@ -141,6 +144,11 @@ const shipmentSchema = new Schema<IShipment>(
     },
     lastPolledAt: {
       type: Date,
+      // Epoch means "never polled": sorts first without a null/$exists branch
+      default: () => new Date(0),
+    },
+    bulkApplyTokens: {
+      type: [Schema.Types.ObjectId],
       default: undefined,
     },
   },
@@ -157,10 +165,10 @@ shipmentSchema.index(
   { unique: true, name: 'uniq_merchant_carrier_tracking' },
 );
 
-// 2. Poller selection: find shipments due for a poll by status and recency.
+// 2. Poller selection: per-carrier pollers find shipments due for a poll by status and recency.
 shipmentSchema.index(
-  { status: 1, lastPolledAt: 1 },
-  { name: 'idx_poller_selection' },
+  { carrier: 1, status: 1, lastPolledAt: 1 },
+  { name: 'idx_poller_carrier_selection' },
 );
 
 // 3. Manifest job: find parcels that need a run-sheet, grouped by carrier & station.

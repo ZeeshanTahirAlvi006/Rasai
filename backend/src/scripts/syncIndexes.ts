@@ -16,6 +16,7 @@ import {
   InboundWaMessage,
   ManifestBatch,
   ImportBatch,
+  ImportChunk,
   carrierHealthModel,
 } from '../models';
 
@@ -27,6 +28,7 @@ const models = [
   { name: 'InboundWaMessage', model: InboundWaMessage },
   { name: 'ManifestBatch', model: ManifestBatch },
   { name: 'ImportBatch', model: ImportBatch },
+  { name: 'ImportChunk', model: ImportChunk },
   { name: 'CarrierHealth', model: carrierHealthModel },
 ];
 
@@ -49,7 +51,7 @@ async function syncAllIndexes(): Promise<void> {
       await model.createIndexes();
 
       const activeIndexes = await model.collection.indexes();
-      const indexNames = activeIndexes.map((idx) => idx.name).join(', ');
+      const indexNames = activeIndexes.map((idx: any) => idx.name).join(', ');
 
       console.log('✅ Done');
       console.log(`   Active indexes (${activeIndexes.length}): ${indexNames}`);

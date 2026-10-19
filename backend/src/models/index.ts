@@ -9,7 +9,7 @@ export { ConversationSession, type IConversationSession } from './ConversationSe
 
 export { InboundWaMessage, type IInboundWaMessage } from './InboundWaMessage';
 
-export { ManifestBatch, type IManifestBatch } from './ManifestBatch';
+export { ManifestBatch, type IManifestBatch } from '../manifestBatch/ManifestBatch';
 
 export { ImportBatch, type IImportBatch } from '../importBatch/ImportBatch.model';
 export { ImportChunk, type IImportChunk } from '../importBatch/ImportChunk.model';

@@ -124,9 +124,12 @@ export async function refreshBulkLease(
   }
 
   const client = redisClient || getRedisClient();
-  // ZADD key XX score member: only update elements that already exist
-  const res = await client.zadd(key, 'XX', leaseUntil, chunkId);
-  return res !== null;
+  const pipeline = client.pipeline();
+  pipeline.zadd(key, 'XX', leaseUntil, chunkId);
+  pipeline.pexpire(key, 300000);
+  const results = await pipeline.exec();
+  const zaddRes = results?.[0]?.[1];
+  return zaddRes !== null && zaddRes !== undefined;
 }
 
 /**
@@ -143,6 +146,9 @@ export async function releaseBulkLease(
     const merchantMap = inMemorySemaphores.get(key);
     if (merchantMap) {
       merchantMap.delete(chunkId);
+      if (merchantMap.size === 0) {
+        inMemorySemaphores.delete(key);
+      }
     }
     return;
   }
