@@ -27,8 +27,11 @@ export const Scene1Packing: React.FC = () => {
 
   // Mutable high-frequency animation refs (mutated in rAF with zero React reconciliation)
   const scrollProgressRef = useRef<number>(0);
+  const targetScrollProgressRef = useRef<number>(0);
   const sealProgressRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
+  const isTouchingRef = useRef<boolean>(false);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
   const isSceneInViewRef = useRef<boolean>(false);
   const lastSoundProgressRef = useRef<number>(0);
   const dragStartClientXRef = useRef<number>(0);
@@ -36,11 +39,16 @@ export const Scene1Packing: React.FC = () => {
   const lastTypedCharCountRef = useRef<number>(-1);
   const cachedCTMInvRef = useRef<DOMMatrix | null>(null);
 
-  // Direct DOM refs for Cloud Plunge & Title Split Curtain
+  // Single-texture hardware-filtered Cloud Curtain canvas (eliminates QHD+ DOM tile eviction rectangles)
   const cloudOverlayRef = useRef<HTMLDivElement>(null);
-  const leftCloudRef = useRef<HTMLDivElement>(null);
-  const rightCloudRef = useRef<HTMLDivElement>(null);
-  const centerFogRef = useRef<HTMLDivElement>(null);
+  const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cloudSpritesRef = useRef<{
+    amber: HTMLCanvasElement;
+    silver: HTMLCanvasElement;
+    slate: HTMLCanvasElement;
+  } | null>(null);
+
+  // Direct DOM refs for Title Split Curtain
   const titleContainerRef = useRef<HTMLDivElement>(null);
   const leftWingRef = useRef<HTMLDivElement>(null);
   const rightWingRef = useRef<HTMLDivElement>(null);
@@ -60,6 +68,194 @@ export const Scene1Packing: React.FC = () => {
   const speechLine2TextRef = useRef<SVGTSpanElement>(null);
   const speechCursorRef = useRef<SVGTSpanElement>(null);
 
+  // Lazily build 3 reusable 128x128 offscreen radial-gradient cloud puff sprites (<0.3ms once)
+  const ensureCloudSprites = useCallback(() => {
+    if (cloudSpritesRef.current || typeof document === 'undefined') {
+      return cloudSpritesRef.current;
+    }
+    const makePuff = (stops: Array<[number, string]>) => {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      const ctx = c.getContext('2d');
+      if (ctx) {
+        const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+        for (const [offset, color] of stops) {
+          g.addColorStop(offset, color);
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 128, 128);
+      }
+      return c;
+    };
+
+    cloudSpritesRef.current = {
+      amber: makePuff([
+        [0, 'rgba(254, 215, 170, 0.90)'],
+        [0.32, 'rgba(241, 205, 168, 0.65)'],
+        [0.64, 'rgba(203, 213, 225, 0.28)'],
+        [1, 'rgba(203, 213, 225, 0)'],
+      ]),
+      silver: makePuff([
+        [0, 'rgba(241, 245, 249, 0.85)'],
+        [0.38, 'rgba(203, 213, 225, 0.58)'],
+        [0.70, 'rgba(148, 163, 184, 0.22)'],
+        [1, 'rgba(148, 163, 184, 0)'],
+      ]),
+      slate: makePuff([
+        [0, 'rgba(148, 163, 184, 0.78)'],
+        [0.42, 'rgba(71, 85, 105, 0.52)'],
+        [0.75, 'rgba(30, 41, 59, 0.24)'],
+        [1, 'rgba(15, 23, 42, 0)'],
+      ]),
+    };
+    return cloudSpritesRef.current;
+  }, []);
+
+  // Render full-bleed volumetric clouds onto a single low-res hardware-filtered canvas texture
+  // Immune to QHD+ DOM tile eviction rectangles and portrait aspect distortion
+  const renderCloudCanvas = useCallback(
+    (cloudProgress: number, cloudOpacity: number) => {
+      const canvas = cloudCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const sprites = ensureCloudSprites();
+      if (!sprites) return;
+
+      const cw = canvas.width;
+      const ch = canvas.height;
+      ctx.clearRect(0, 0, cw, ch);
+
+      // Solid atmospheric night-sky backdrop that holds opaque while Title parts, then dissolves
+      const backdropAlpha = Math.max(0, Math.min(1, (1 - cloudProgress * 1.18) * 1.15));
+      if (backdropAlpha > 0.005) {
+        ctx.fillStyle = `rgba(7, 9, 14, ${(backdropAlpha * cloudOpacity).toFixed(3)})`;
+        ctx.fillRect(0, 0, cw, ch);
+      }
+
+      // Use a horizontal reference span so cloud billows are ALWAYS wider than tall on both portrait & landscape
+      const span = Math.max(cw, ch * 0.78);
+      const partOffset = cloudProgress * cw * 0.78;
+      const bankScale = 1 + cloudProgress * 0.85;
+      const centerZoom = 1 + cloudProgress * 1.65;
+
+      const drawEllipticalPuff = (
+        img: HTMLCanvasElement,
+        cx: number,
+        cy: number,
+        rx: number,
+        ry: number,
+        alpha: number
+      ) => {
+        if (alpha <= 0.004) return;
+        ctx.globalAlpha = Math.min(1, alpha * cloudOpacity);
+        ctx.drawImage(img, cx - rx, cy - ry, rx * 2, ry * 2);
+      };
+
+      // 1. Central Fog Plume (expands outward from center as camera plunges through)
+      const centerFade = Math.max(0, 1 - cloudProgress * 1.1);
+      drawEllipticalPuff(
+        sprites.slate,
+        cw * 0.5,
+        ch * 0.52,
+        span * 0.72 * centerZoom,
+        span * 0.46 * centerZoom,
+        0.92 * centerFade
+      );
+      drawEllipticalPuff(
+        sprites.amber,
+        cw * 0.5,
+        ch * 0.48,
+        span * 0.52 * centerZoom,
+        span * 0.34 * centerZoom,
+        0.78 * centerFade
+      );
+
+      // 2. Left Cloud Bank (parts leftward as user scrolls)
+      const leftBaseX = cw * 0.28 - partOffset;
+      drawEllipticalPuff(
+        sprites.slate,
+        leftBaseX - span * 0.08,
+        ch * 0.56,
+        span * 0.62 * bankScale,
+        span * 0.38 * bankScale,
+        0.9
+      );
+      drawEllipticalPuff(
+        sprites.silver,
+        leftBaseX + span * 0.06,
+        ch * 0.36,
+        span * 0.54 * bankScale,
+        span * 0.32 * bankScale,
+        0.82
+      );
+      drawEllipticalPuff(
+        sprites.amber,
+        leftBaseX + span * 0.12,
+        ch * 0.48,
+        span * 0.48 * bankScale,
+        span * 0.29 * bankScale,
+        0.86
+      );
+      drawEllipticalPuff(
+        sprites.silver,
+        leftBaseX - span * 0.14,
+        ch * 0.72,
+        span * 0.56 * bankScale,
+        span * 0.33 * bankScale,
+        0.76
+      );
+
+      // 3. Right Cloud Bank (parts rightward as user scrolls)
+      const rightBaseX = cw * 0.72 + partOffset;
+      drawEllipticalPuff(
+        sprites.slate,
+        rightBaseX + span * 0.08,
+        ch * 0.54,
+        span * 0.62 * bankScale,
+        span * 0.38 * bankScale,
+        0.9
+      );
+      drawEllipticalPuff(
+        sprites.silver,
+        rightBaseX - span * 0.06,
+        ch * 0.38,
+        span * 0.54 * bankScale,
+        span * 0.32 * bankScale,
+        0.82
+      );
+      drawEllipticalPuff(
+        sprites.amber,
+        rightBaseX - span * 0.12,
+        ch * 0.50,
+        span * 0.48 * bankScale,
+        span * 0.29 * bankScale,
+        0.86
+      );
+      drawEllipticalPuff(
+        sprites.silver,
+        rightBaseX + span * 0.14,
+        ch * 0.70,
+        span * 0.56 * bankScale,
+        span * 0.33 * bankScale,
+        0.76
+      );
+
+      // 4. Seamless top edge blend into Hero Section (#010101 / #0b0b0b)
+      ctx.globalAlpha = cloudOpacity;
+      const topGrad = ctx.createLinearGradient(0, 0, 0, ch * 0.16);
+      topGrad.addColorStop(0, 'rgba(5, 7, 12, 0.95)');
+      topGrad.addColorStop(0.45, 'rgba(5, 7, 12, 0.45)');
+      topGrad.addColorStop(1, 'rgba(5, 7, 12, 0)');
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(0, 0, cw, ch * 0.16);
+      ctx.globalAlpha = 1;
+    },
+    [ensureCloudSprites]
+  );
+
   const updateCachedCTM = useCallback(() => {
     if (!trackRef.current) return;
     try {
@@ -71,95 +267,86 @@ export const Scene1Packing: React.FC = () => {
   }, []);
 
   // Apply scroll progress directly to DOM nodes without triggering React re-renders
-  const applyScrollMutations = useCallback((progress: number) => {
-    scrollProgressRef.current = progress;
+  const applyScrollMutations = useCallback(
+    (progress: number) => {
+      scrollProgressRef.current = progress;
 
-    // 1. Cloud Plunge (0.0 -> 0.36)
-    const cloudProgress = Math.max(0, Math.min(1, progress / 0.36));
-    const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.4));
-    const cloudPartLeft = cloudProgress * -60;
-    const cloudPartRight = cloudProgress * 60;
-    const cloudScale = 1 + cloudProgress * 1.8;
-    const fogScale = 1 + cloudProgress * 2.5;
+      // Phase 1: Title Hold (0.00 -> 0.04) & Split Curtain Parting (0.04 -> 0.28)
+      const titlePartProgress = Math.max(0, Math.min(1, (progress - 0.04) / 0.24));
+      const titleOpacity = Math.max(0, 1 - Math.pow(titlePartProgress, 1.35));
+      const splitOffsetPercent = titlePartProgress * 125;
+      const splitDividerOpacity = Math.max(0, 1 - titlePartProgress * 3.2);
 
-    if (cloudOverlayRef.current) {
-      if (cloudOpacity <= 0.002) {
-        cloudOverlayRef.current.style.display = 'none';
-      } else {
-        cloudOverlayRef.current.style.display = 'block';
-        cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
-      }
-    }
-    if (leftCloudRef.current && cloudOpacity > 0.002) {
-      leftCloudRef.current.style.transform = `translate3d(${cloudPartLeft.toFixed(2)}%, 0, 0) scale3d(${cloudScale.toFixed(3)}, ${cloudScale.toFixed(3)}, 1)`;
-    }
-    if (rightCloudRef.current && cloudOpacity > 0.002) {
-      rightCloudRef.current.style.transform = `translate3d(${cloudPartRight.toFixed(2)}%, 0, 0) scale3d(${cloudScale.toFixed(3)}, ${cloudScale.toFixed(3)}, 1)`;
-    }
-    if (centerFogRef.current && cloudOpacity > 0.002) {
-      centerFogRef.current.style.transform = `scale3d(${fogScale.toFixed(3)}, ${fogScale.toFixed(3)}, 1)`;
-    }
-
-    // 2. Title Split Curtain (0.0 -> 0.26)
-    const titlePartProgress = Math.max(0, Math.min(1, progress / 0.26));
-    const titleOpacity = Math.max(0, 1 - Math.pow(titlePartProgress, 1.3));
-    const splitOffsetPercent = titlePartProgress * 125;
-    const splitDividerOpacity = Math.max(0, 1 - titlePartProgress * 3.5);
-
-    if (titleContainerRef.current) {
-      if (titleOpacity <= 0.002) {
-        titleContainerRef.current.style.display = 'none';
-      } else {
-        titleContainerRef.current.style.display = 'flex';
-        titleContainerRef.current.style.opacity = titleOpacity.toFixed(3);
-      }
-    }
-    if (leftWingRef.current && titleOpacity > 0.002) {
-      leftWingRef.current.style.transform = `translate3d(-${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
-    }
-    if (rightWingRef.current && titleOpacity > 0.002) {
-      rightWingRef.current.style.transform = `translate3d(${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
-    }
-    if (splitDividerRef.current && titleOpacity > 0.002) {
-      splitDividerRef.current.style.opacity = splitDividerOpacity.toFixed(3);
-    }
-    if (scrollPromptRef.current && titleOpacity > 0.002) {
-      scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 4).toFixed(3);
-    }
-
-    // 3. Occlusion Gating: Pause warehouse SVG CSS animations when completely hidden behind opaque clouds
-    if (trackRef.current) {
-      const shouldPauseWarehouse = !isSceneInViewRef.current || progress < 0.015;
-      trackRef.current.classList.toggle('warehouse-paused', shouldPauseWarehouse);
-      trackRef.current.style.visibility = progress < 0.005 ? 'hidden' : 'visible';
-    }
-
-    // 4. Typewriter Dialogue (starts when warehouse is revealed at scrollProgress > 0.34)
-    const dialogueTrigger = Math.max(0, Math.min(1, (progress - 0.34) / 0.32));
-    const typedCharCount = Math.floor(dialogueTrigger * DIALOGUE_FULL.length);
-
-    if (typedCharCount !== lastTypedCharCountRef.current) {
-      lastTypedCharCountRef.current = typedCharCount;
-      if (speechBubbleGroupRef.current) {
-        speechBubbleGroupRef.current.style.display = typedCharCount > 0 ? 'block' : 'none';
-      }
-      if (typedCharCount > 0) {
-        const displayed = DIALOGUE_FULL.slice(0, typedCharCount);
-        const isComplete = typedCharCount >= DIALOGUE_FULL.length;
-        if (speechLine1Ref.current) {
-          speechLine1Ref.current.textContent = `"${displayed.slice(0, 36)}`;
-        }
-        if (speechLine2TextRef.current) {
-          speechLine2TextRef.current.textContent = isComplete
-            ? `${displayed.slice(36)}"`
-            : displayed.slice(36);
-        }
-        if (speechCursorRef.current) {
-          speechCursorRef.current.style.display = isComplete ? 'none' : 'inline';
+      if (titleContainerRef.current) {
+        if (titleOpacity <= 0.002) {
+          titleContainerRef.current.style.display = 'none';
+        } else {
+          titleContainerRef.current.style.display = 'flex';
+          titleContainerRef.current.style.opacity = titleOpacity.toFixed(3);
         }
       }
-    }
-  }, []);
+      if (leftWingRef.current && titleOpacity > 0.002) {
+        leftWingRef.current.style.transform = `translate3d(-${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+      }
+      if (rightWingRef.current && titleOpacity > 0.002) {
+        rightWingRef.current.style.transform = `translate3d(${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+      }
+      if (splitDividerRef.current && titleOpacity > 0.002) {
+        splitDividerRef.current.style.opacity = splitDividerOpacity.toFixed(3);
+      }
+      if (scrollPromptRef.current && titleOpacity > 0.002) {
+        scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 3.5).toFixed(3);
+      }
+
+      // Phase 2: Volumetric Cloud Plunge (holds dense during 0.00 -> 0.14 while title is read, then parts 0.14 -> 0.48)
+      const cloudProgress = Math.max(0, Math.min(1, (progress - 0.10) / 0.38));
+      const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.55));
+
+      if (cloudOverlayRef.current) {
+        if (cloudOpacity <= 0.002) {
+          cloudOverlayRef.current.style.display = 'none';
+        } else {
+          cloudOverlayRef.current.style.display = 'block';
+          cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
+          renderCloudCanvas(cloudProgress, cloudOpacity);
+        }
+      }
+
+      // Phase 3: Occlusion Gating — keep warehouse hidden while clouds are 100% opaque (progress < 0.11)
+      if (trackRef.current) {
+        const shouldPauseWarehouse = !isSceneInViewRef.current || progress < 0.11;
+        trackRef.current.classList.toggle('warehouse-paused', shouldPauseWarehouse);
+        trackRef.current.style.visibility = progress < 0.10 ? 'hidden' : 'visible';
+      }
+
+      // Phase 4: Typewriter Dialogue (starts cleanly as clouds finish parting at progress > 0.46 -> 0.84)
+      const dialogueTrigger = Math.max(0, Math.min(1, (progress - 0.46) / 0.38));
+      const typedCharCount = Math.floor(dialogueTrigger * DIALOGUE_FULL.length);
+
+      if (typedCharCount !== lastTypedCharCountRef.current) {
+        lastTypedCharCountRef.current = typedCharCount;
+        if (speechBubbleGroupRef.current) {
+          speechBubbleGroupRef.current.style.display = typedCharCount > 0 ? 'block' : 'none';
+        }
+        if (typedCharCount > 0) {
+          const displayed = DIALOGUE_FULL.slice(0, typedCharCount);
+          const isComplete = typedCharCount >= DIALOGUE_FULL.length;
+          if (speechLine1Ref.current) {
+            speechLine1Ref.current.textContent = `"${displayed.slice(0, 36)}`;
+          }
+          if (speechLine2TextRef.current) {
+            speechLine2TextRef.current.textContent = isComplete
+              ? `${displayed.slice(36)}"`
+              : displayed.slice(36);
+          }
+          if (speechCursorRef.current) {
+            speechCursorRef.current.style.display = isComplete ? 'none' : 'inline';
+          }
+        }
+      }
+    },
+    [renderCloudCanvas]
+  );
 
   // Apply tape sealing mutations directly to SVG attributes without React re-renders
   const applyTapeMutations = useCallback(
@@ -212,7 +399,7 @@ export const Scene1Packing: React.FC = () => {
           mountObserver.disconnect();
         }
       },
-      { rootMargin: '350px 0px' }
+      { rootMargin: '400px 0px' }
     );
     mountObserver.observe(el);
 
@@ -222,7 +409,7 @@ export const Scene1Packing: React.FC = () => {
         if (!entry) return;
         isSceneInViewRef.current = entry.isIntersecting;
         if (trackRef.current) {
-          const shouldPause = !entry.isIntersecting || scrollProgressRef.current < 0.015;
+          const shouldPause = !entry.isIntersecting || scrollProgressRef.current < 0.11;
           trackRef.current.classList.toggle('warehouse-paused', shouldPause);
         }
       },
@@ -238,14 +425,28 @@ export const Scene1Packing: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const portrait = window.innerWidth < 768 || window.innerWidth / window.innerHeight < 0.95;
+      const vw = Math.max(1, window.innerWidth);
+      const vh = Math.max(1, window.innerHeight);
+      const portrait = vw < 768 || vw / vh < 0.95;
       setIsPortrait(portrait);
       cachedCTMInvRef.current = null;
+
+      // Size the single-texture cloud canvas to a lightweight ~420px internal buffer
+      if (cloudCanvasRef.current) {
+        const aspect = vw / vh;
+        const targetW = aspect >= 1 ? 480 : Math.round(480 * aspect);
+        const targetH = aspect >= 1 ? Math.round(480 / aspect) : 480;
+        if (cloudCanvasRef.current.width !== targetW || cloudCanvasRef.current.height !== targetH) {
+          cloudCanvasRef.current.width = Math.max(240, targetW);
+          cloudCanvasRef.current.height = Math.max(240, targetH);
+        }
+      }
+      applyScrollMutations(scrollProgressRef.current);
     };
     window.addEventListener('resize', handleResize, { passive: true });
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [applyScrollMutations]);
 
   // Re-sync direct DOM state when warehouse mounts or orientation changes
   useEffect(() => {
@@ -257,40 +458,149 @@ export const Scene1Packing: React.FC = () => {
     }
   }, [isWarehouseMounted, isPortrait, applyScrollMutations, applyTapeMutations, updateCachedCTM]);
 
-  // Coalesced rAF Scroll Listener (0 React state re-renders)
+  // ============================================================================
+  // REFRESH-RATE-INDEPENDENT (60Hz / 90Hz / 120Hz / 144Hz / 240Hz) SCROLL ENGINE
+  // - Uses true delta-time (dt in seconds) via performance.now() — NEVER fixed to 60fps
+  // - Caps maximum animation velocity (MAX_PROGRESS_SPEED = 0.34 / sec) and tethers
+  //   runaway mobile touch flings so fast swipes never skip Title / Cloud / Dialogue phases
+  // ============================================================================
   useEffect(() => {
     let rafId = 0;
-    let ticking = false;
+    let lastFrameTime = 0;
 
-    const updateOnScroll = () => {
-      ticking = false;
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const windowHeight = window.innerHeight;
-      const totalScrollable = rect.height - windowHeight;
+    // Maximum narrative progress speed per second (0 -> 1 takes at least ~2.95s even on violent fling)
+    const MAX_PROGRESS_SPEED = 0.34;
+    // Exponential damping stiffness (higher = more responsive to slow scroll, capped by MAX_PROGRESS_SPEED on fast scroll)
+    const DAMPING_LAMBDA = 9.5;
+    // Maximum lead distance native scroll can get ahead of rendered animation during a fast fling
+    const MAX_FLING_LEAD = 0.16;
 
-      if (totalScrollable <= 0) return;
+    const animateScrollLoop = (now: number) => {
+      const dt =
+        lastFrameTime > 0
+          ? Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000))
+          : 1 / 120;
+      lastFrameTime = now;
 
-      const currentScroll = -rect.top;
-      const progress = Math.max(0, Math.min(1, currentScroll / totalScrollable));
-      if (progress > 0 && !isWarehouseMounted) {
-        setIsWarehouseMounted(true);
+      const target = targetScrollProgressRef.current;
+      const current = scrollProgressRef.current;
+      const diff = target - current;
+
+      if (Math.abs(diff) <= 0.0004) {
+        if (current !== target) {
+          applyScrollMutations(target);
+        }
+        rafId = 0;
+        lastFrameTime = 0;
+        return;
       }
-      applyScrollMutations(progress);
+
+      // Frame-rate-independent exponential smoothing + hard velocity ceiling
+      const alpha = 1 - Math.exp(-DAMPING_LAMBDA * dt);
+      const dampedStep = diff * alpha;
+      const maxStep = MAX_PROGRESS_SPEED * dt;
+      const step =
+        Math.abs(dampedStep) > maxStep ? Math.sign(dampedStep) * maxStep : dampedStep;
+
+      const nextProgress = Math.max(0, Math.min(1, current + step));
+      applyScrollMutations(nextProgress);
+
+      rafId = requestAnimationFrame(animateScrollLoop);
+    };
+
+    const startLoopIfNeeded = () => {
+      if (!rafId) {
+        lastFrameTime = performance.now();
+        rafId = requestAnimationFrame(animateScrollLoop);
+      }
     };
 
     const handleScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        rafId = requestAnimationFrame(updateOnScroll);
+      if (isProgrammaticScrollRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const totalScrollable = rect.height - windowHeight;
+      if (totalScrollable <= 0) return;
+
+      const currentScroll = -rect.top;
+      let rawTarget = Math.max(0, Math.min(1, currentScroll / totalScrollable));
+
+      if (rawTarget > 0 && !isWarehouseMounted) {
+        setIsWarehouseMounted(true);
+      }
+
+      // When inside Scene 1, prevent violent mobile touch-fling inertia from teleporting
+      // the native scroll position all the way to the bottom/top ahead of the animation
+      const isInsideScene = rect.top <= 0 && rect.bottom >= windowHeight;
+      const rendered = scrollProgressRef.current;
+      const lead = rawTarget - rendered;
+
+      if (isInsideScene && !isTouchingRef.current && Math.abs(lead) > MAX_FLING_LEAD) {
+        rawTarget = Math.max(0, Math.min(1, rendered + Math.sign(lead) * MAX_FLING_LEAD));
+        const containerDocTop = window.scrollY + rect.top;
+        const clampedScrollY = containerDocTop + rawTarget * totalScrollable;
+        isProgrammaticScrollRef.current = true;
+        window.scrollTo(0, clampedScrollY);
+        requestAnimationFrame(() => {
+          isProgrammaticScrollRef.current = false;
+        });
+      }
+
+      targetScrollProgressRef.current = rawTarget;
+      startLoopIfNeeded();
+    };
+
+    // Clamp excessive desktop mouse-wheel bursts inside Scene 1 so wheel spins don't skip phases
+    const handleWheel = (e: WheelEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const isInsideScene = rect.top <= 4 && rect.bottom >= windowHeight - 4;
+      if (!isInsideScene) return;
+
+      // Allow exiting the top of Scene 1 when scrolling up at progress ~0, or bottom at progress ~1
+      if (e.deltaY < 0 && scrollProgressRef.current <= 0.01 && rect.top >= -4) return;
+      if (e.deltaY > 0 && scrollProgressRef.current >= 0.99 && rect.bottom <= windowHeight + 4) return;
+
+      const maxWheelPx = windowHeight * 0.09;
+      if (Math.abs(e.deltaY) > maxWheelPx) {
+        e.preventDefault();
+        window.scrollBy({
+          top: Math.sign(e.deltaY) * maxWheelPx,
+          behavior: 'instant' as ScrollBehavior,
+        });
       }
     };
 
+    const handleTouchStart = () => {
+      isTouchingRef.current = true;
+    };
+    const handleTouchEnd = () => {
+      isTouchingRef.current = false;
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    updateOnScroll();
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    // Initialize state from current scroll position on mount
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalScrollable = Math.max(1, rect.height - window.innerHeight);
+      const initialProgress = Math.max(0, Math.min(1, -rect.top / totalScrollable));
+      targetScrollProgressRef.current = initialProgress;
+      applyScrollMutations(initialProgress);
+    }
+
     return () => {
-      cancelAnimationFrame(rafId);
+      if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [applyScrollMutations, isWarehouseMounted]);
 
@@ -424,7 +734,7 @@ export const Scene1Packing: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[300vh] bg-[#0b0b0b]"
+      className="relative w-full h-[460vh] bg-[#0b0b0b]"
       id="movie-scene-1"
       data-story-scene="true"
     >
@@ -2394,9 +2704,9 @@ export const Scene1Packing: React.FC = () => {
           )}
 
           {/* =========================================================================
-              HARDWARE-ACCELERATED FULL-BLEED CSS CLOUDS OVERLAY (ZERO BLUR FILTER)
-              Uses 180vmax × 180vmax aspect-locked square layers so portrait mobile
-              screens never squash horizontal clouds into vertical slits.
+              SINGLE-TEXTURE HARDWARE-FILTERED CLOUD CURTAIN CANVAS
+              Replaces oversized scaled DOM layers with a single ~420px canvas texture
+              to prevent QHD+ 120Hz Chromium PictureLayerImpl tile eviction rectangles.
               ========================================================================= */}
           <div
             ref={cloudOverlayRef}
@@ -2406,76 +2716,11 @@ export const Scene1Packing: React.FC = () => {
               transform: 'translateZ(0)',
             }}
           >
-            {/* Deep atmospheric base */}
-            <div className="absolute inset-0 bg-[#05070c]" />
-
-            {/* Left Cloud Bank — wide horizontal stratocumulus & cumulus puffs in a 1:1 physical square */}
-            <div
-              ref={leftCloudRef}
-              className="absolute transform-gpu will-change-transform"
-              style={{
-                width: '180vmax',
-                height: '180vmax',
-                left: 'calc(50% - 90vmax)',
-                top: 'calc(50% - 90vmax)',
-                transform: 'translate3d(0%, 0, 0) scale3d(1, 1, 1)',
-                transformOrigin: '35% 50%',
-                background: [
-                  'radial-gradient(ellipse 36% 18% at 36% 42%, rgba(254, 215, 170, 0.78) 0%, rgba(203, 213, 225, 0.52) 45%, rgba(148, 163, 184, 0.18) 72%, transparent 95%)',
-                  'radial-gradient(ellipse 40% 22% at 44% 56%, rgba(203, 213, 225, 0.72) 0%, rgba(148, 163, 184, 0.42) 48%, rgba(71, 85, 105, 0.15) 75%, transparent 96%)',
-                  'radial-gradient(ellipse 32% 16% at 28% 52%, rgba(226, 232, 240, 0.65) 0%, rgba(148, 163, 184, 0.32) 52%, transparent 92%)',
-                ].join(', '),
-              }}
-            />
-
-            {/* Right Cloud Bank — wide horizontal stratocumulus & cumulus puffs in a 1:1 physical square */}
-            <div
-              ref={rightCloudRef}
-              className="absolute transform-gpu will-change-transform"
-              style={{
-                width: '180vmax',
-                height: '180vmax',
-                left: 'calc(50% - 90vmax)',
-                top: 'calc(50% - 90vmax)',
-                transform: 'translate3d(0%, 0, 0) scale3d(1, 1, 1)',
-                transformOrigin: '65% 50%',
-                background: [
-                  'radial-gradient(ellipse 38% 19% at 64% 46%, rgba(254, 215, 170, 0.78) 0%, rgba(203, 213, 225, 0.52) 45%, rgba(148, 163, 184, 0.18) 72%, transparent 95%)',
-                  'radial-gradient(ellipse 40% 21% at 56% 36%, rgba(203, 213, 225, 0.7) 0%, rgba(148, 163, 184, 0.4) 48%, rgba(71, 85, 105, 0.15) 75%, transparent 96%)',
-                  'radial-gradient(ellipse 34% 17% at 70% 58%, rgba(226, 232, 240, 0.65) 0%, rgba(148, 163, 184, 0.32) 52%, transparent 92%)',
-                ].join(', '),
-              }}
-            />
-
-            {/* Central Fog Plume — wide horizontal atmospheric haze in a 1:1 physical square */}
-            <div
-              ref={centerFogRef}
-              className="absolute inset-0 flex items-center justify-center transform-gpu will-change-transform"
-              style={{
-                transform: 'scale3d(1, 1, 1)',
-                transformOrigin: 'center center',
-              }}
-            >
-              <div
-                className="flex-shrink-0"
-                style={{
-                  width: '180vmax',
-                  height: '180vmax',
-                  background: [
-                    'radial-gradient(ellipse 42% 24% at 50% 48%, rgba(255, 237, 213, 0.65) 0%, rgba(148, 163, 184, 0.48) 38%, rgba(30, 41, 59, 0.55) 68%, transparent 95%)',
-                    'radial-gradient(ellipse 46% 28% at 48% 54%, rgba(203, 213, 225, 0.45) 0%, rgba(71, 85, 105, 0.38) 48%, transparent 92%)',
-                  ].join(', '),
-                }}
-              />
-            </div>
-
-            {/* Seamless Top & Bottom Atmospheric Vignette Blend into Hero Section */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(to bottom, #0b0b0b 0%, rgba(11, 11, 11, 0.4) 6%, transparent 18%, transparent 85%, rgba(5, 7, 12, 0.6) 100%)',
-              }}
+            <canvas
+              ref={cloudCanvasRef}
+              width={480}
+              height={480}
+              className="w-full h-full block pointer-events-none"
             />
           </div>
 
