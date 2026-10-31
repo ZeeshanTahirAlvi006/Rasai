@@ -4,6 +4,7 @@
 // embroidered kurta with fabric folds, walnut table, laptop, steaming chai, and Rs. 4,500 COD cash.
 
 import React, { forwardRef } from 'react';
+import { LOGO_PATHS } from '../logoData';
 
 export interface CustomerAyeshaProps extends React.SVGProps<SVGGElement> {
   /**
@@ -133,6 +134,16 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G" />
           </filter>
 
+          {/* Path-Traced Contact Shadow Filter (Crisp Umbra under Laptop Feet & Base) */}
+          <filter id="laptopContactShadowFilter" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="1.5" />
+          </filter>
+
+          {/* Path-Traced Directional Cast Shadow Filter (Soft Penumbra on Walnut Wood) */}
+          <filter id="laptopCastShadowFilter" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="4.8" />
+          </filter>
+
           {/* 3D Subsurface Scattering Skin Gradient (Warm Sunlit South Asian Tone) */}
           <radialGradient id="ayeshaSkin3D" cx="38%" cy="32%" r="68%" fx="32%" fy="26%">
             <stop offset="0%" stopColor="#fae1cb" />
@@ -208,28 +219,87 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             <stop offset="100%" stopColor="#0d0401" />
           </linearGradient>
 
-          {/* Brushed Anodized Space-Silver / Titanium 3D Laptop Lid Gradient */}
-          <linearGradient id="laptopLid3D" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#e2e8f0" />
-            <stop offset="26%" stopColor="#94a3b8" />
-            <stop offset="54%" stopColor="#cbd5e1" />
-            <stop offset="78%" stopColor="#64748b" />
-            <stop offset="100%" stopColor="#334155" />
+          {/* AEROPRO 16″ CNC UNIBODY DESIGN TOKENS & SHADERS (Space Black Anodized Oxide Seal) */}
+          <linearGradient id="aeroProLidGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#0e0f12" />
+            <stop offset="22%" stopColor="#18191d" />
+            <stop offset="50%" stopColor="#24262c" />
+            <stop offset="72%" stopColor="#494d57" />
+            <stop offset="88%" stopColor="#18191d" />
+            <stop offset="100%" stopColor="#0e0f12" />
           </linearGradient>
 
-          {/* 3D Machined Aluminum Laptop Chassis Edge Gradient */}
-          <linearGradient id="laptopDeckEdge3D" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#f8fafc" />
-            <stop offset="30%" stopColor="#94a3b8" />
-            <stop offset="72%" stopColor="#475569" />
-            <stop offset="100%" stopColor="#1e293b" />
+          {/* Multi-Stop PVD Vapor-Deposited Chrome Mirror Reflection Gradient */}
+          <linearGradient id="aeroProMirrorLogo" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#090a0d" />
+            <stop offset="22%" stopColor="#5c6270" />
+            <stop offset="46%" stopColor="#ffffff" />
+            <stop offset="54%" stopColor="#1b1d22" />
+            <stop offset="78%" stopColor="#7b8291" />
+            <stop offset="100%" stopColor="#121317" />
+          </linearGradient>
+
+          {/* Central Cylindrical Barrel Clutch Hinge Gradient */}
+          <linearGradient id="aeroProHingeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#272a33" />
+            <stop offset="35%" stopColor="#141519" />
+            <stop offset="70%" stopColor="#0c0d10" />
+            <stop offset="100%" stopColor="#050608" />
+          </linearGradient>
+
+          {/* 6063-T6 Aerospace Aluminum Chassis Edge & Side Wall Gradient */}
+          <linearGradient id="aeroProEdgeWall" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#282a32" />
+            <stop offset="32%" stopColor="#1a1b20" />
+            <stop offset="70%" stopColor="#141519" />
+            <stop offset="100%" stopColor="#0a0b0d" />
+          </linearGradient>
+
+          {/* Ray-Traced Directional Shadow Gradient on Table (Attenuates with Distance from Base) */}
+          <linearGradient id="laptopCastShadowGrad" x1="0%" y1="0%" x2="100%" y2="70%">
+            <stop offset="0%" stopColor="#080201" stopOpacity="0.78" />
+            <stop offset="35%" stopColor="#120502" stopOpacity="0.48" />
+            <stop offset="70%" stopColor="#1a0904" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#1a0904" stopOpacity="0" />
+          </linearGradient>
+
+          {/* Ray-Traced Screen Area Light Spill (Soft Emission from Active Display facing Ayesha) */}
+          <radialGradient id="screenAreaLightSpill" cx="0%" cy="50%" r="85%">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.35" />
+            <stop offset="35%" stopColor="#0284c7" stopOpacity="0.15" />
+            <stop offset="70%" stopColor="#0369a1" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#0284c7" stopOpacity="0" />
+          </radialGradient>
+
+          {/* Rasai Metallic Backlid Chrome Shaders */}
+          <linearGradient id="rasaiLidChromeOuter" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#94a3b8" />
+            <stop offset="35%" stopColor="#e2e8f0" />
+            <stop offset="68%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#cbd5e1" />
+          </linearGradient>
+          <linearGradient id="rasaiLidChromeInner" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#cbd5e1" />
+            <stop offset="50%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#e2e8f0" />
+          </linearGradient>
+          <linearGradient id="rasaiLidChromeLower" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#64748b" />
+            <stop offset="55%" stopColor="#94a3b8" />
+            <stop offset="100%" stopColor="#e2e8f0" />
+          </linearGradient>
+          <linearGradient id="rasaiLidChromeArrow" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#cbd5e1" />
+            <stop offset="40%" stopColor="#ffffff" />
+            <stop offset="70%" stopColor="#94a3b8" />
+            <stop offset="100%" stopColor="#ffffff" />
           </linearGradient>
 
           {/* Soft Blue/White Screen Light Spill Cast by Laptop Facing Ayesha */}
           <radialGradient id="laptopScreenSpill" cx="25%" cy="50%" r="75%">
-            <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.42" />
-            <stop offset="42%" stopColor="#38bdf8" stopOpacity="0.18" />
-            <stop offset="78%" stopColor="#bae6fd" stopOpacity="0.06" />
+            <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.45" />
+            <stop offset="42%" stopColor="#38bdf8" stopOpacity="0.22" />
+            <stop offset="78%" stopColor="#bae6fd" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
           </radialGradient>
 
@@ -708,154 +778,274 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
           <ellipse cx="488" cy="669" rx="46" ry="9" fill="#090300" opacity="0.52" />
 
           {/* --------------------------------------------------------------- */}
-          {/* PROP A: Back-Angled 3D Unibody Laptop                            */}
-          {/* (Screen & Keyboard both face Ayesha; viewer only sees lid back)   */}
+          {/* PROP A: 16″ CNC UNIBODY WORKSTATION (PATH-TRACED REAR-LID VIEW) */}
+          {/* Widescreen 16:10 dimensions, ray-traced contact umbra & soft     */}
+          {/* cast penumbra, solid unibody base with left I/O profile wall,    */}
+          {/* active screen area-light spill, and the official Rasai emblem.   */}
           {/* --------------------------------------------------------------- */}
           <g id="table-laptop" transform="translate(64, 526)">
-            {/* Cool Blue/White Screen Light Pool Spilling Toward Ayesha Across Table */}
-            <ellipse
-              cx="210"
-              cy="148"
-              rx="145"
-              ry="28"
-              fill="url(#laptopScreenSpill)"
-            />
+            {/* 1. PATH-TRACED DIRECTIONAL CAST SHADOW ON WALNUT TABLE (PENUMBRA) */}
+            {/* Soft optical shadow cast down-right by the tall 16″ lid under window sunlight */}
             <polygon
-              points="160,118 310,95 345,168 150,158"
-              fill="url(#laptopScreenSpill)"
+              points="48,168 115,178 285,166 260,146 204,136"
+              fill="url(#laptopCastShadowGrad)"
+              filter="url(#laptopCastShadowFilter)"
             />
 
-            {/* Multi-Layered Ambient Occlusion & Cast Shadow Under Laptop Base */}
+            {/* 2. CONTACT AMBIENT OCCLUSION SHADOW DIRECTLY UNDER CHASSIS (UMBRA) */}
             <polygon
-              points="38,154 186,136 216,148 54,168"
+              points="26,149 206,134 228,158 50,174"
               fill="#090300"
+              opacity="0.88"
+              filter="url(#laptopContactShadowFilter)"
+            />
+
+            {/* 4 Precision Elastomeric Anti-Slip Rubber Feet Anchoring Base to Table */}
+            <ellipse cx="36" cy="149" rx="5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
+            <ellipse cx="202" cy="136" rx="5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
+            <ellipse cx="56" cy="172" rx="5.5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
+            <ellipse cx="220" cy="157" rx="5.5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
+
+            {/* 3. RAY-TRACED SCREEN AREA LIGHT (EMISSION SPILL TOWARD AYESHA) */}
+            {/* Soft cyan light cone emitted from active display facing inward across table */}
+            <polygon
+              points="208,132 212,36 320,105 340,175 190,165"
+              fill="url(#screenAreaLightSpill)"
+            />
+
+            {/* 4. SOLID UNIBODY LOWER BASE CHASSIS (6063-T6 ANODIZED ALLOY) */}
+            {/* Top Deck Surface Visible Forward of the Hinge Line */}
+            <polygon
+              points="28,146 208,132 226,156 52,172"
+              fill="#18191d"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.5"
+            />
+            {/* Soft Keyboard Well / Trackpad Subtle Specular Outline */}
+            <polygon
+              points="78,160 196,149 190,140 74,151"
+              fill="#0c0d11"
               opacity="0.75"
             />
-            <ellipse cx="125" cy="154" rx="88" ry="14" fill="#090300" opacity="0.48" />
 
-            {/* Elastomeric Anti-Slip Rubber Feet Under Unibody Base */}
-            <ellipse cx="50" cy="162" rx="7" ry="2.2" fill="#020617" />
-            <ellipse cx="188" cy="144" rx="7" ry="2.2" fill="#020617" />
-
-            {/* 3D Machined Aluminum Lower Base Chassis (Only Rear & Side Thickness Visible) */}
-            {/* Left Profile Edge of Base Chassis (Showing thickness, ports & charging light) */}
+            {/* Front Lip Wall (Facing Forward with Ergonomic Thumb Notch) */}
             <polygon
-              points="42,148 58,162 58,168 42,154"
-              fill="url(#laptopDeckEdge3D)"
-              stroke="#1e293b"
-              strokeWidth="0.8"
+              points="52,172 226,156 226,162 52,178"
+              fill="url(#aeroProEdgeWall)"
+              stroke="rgba(255,255,255,0.16)"
+              strokeWidth="0.5"
             />
-            {/* Rear Face of Base Chassis Under Hinge */}
+            {/* CNC Milled Thumb Groove Centered on Front Lip */}
             <polygon
-              points="42,154 186,138 186,144 42,154"
-              fill="#334155"
-              stroke="#1e293b"
-              strokeWidth="0.8"
+              points="126,164.5 152,162.5 152,165 126,167"
+              fill="#0a0b0e"
+              stroke="rgba(255,255,255,0.22)"
+              strokeWidth="0.4"
             />
-            {/* Specular Bottom Lip Along Base */}
-            <line x1="42" y1="154" x2="186" y2="138" stroke="#64748b" strokeWidth="0.8" />
 
-            {/* Ports on Left Side Chassis Profile */}
-            {/* MagSafe 3 Port with Emerald Charging LED */}
-            <polygon points="46,151 51,155 51,157 46,153" fill="#0f172a" stroke="#cbd5e1" strokeWidth="0.4" />
-            <circle cx="48.5" cy="153.5" r="0.9" fill="#10b981" />
-            {/* Dual Thunderbolt / USB-C Ports */}
-            <polygon points="53,157 56,159.5 56,161.5 53,159" fill="#0f172a" stroke="#94a3b8" strokeWidth="0.4" />
+            {/* Left Profile Side Wall (Facing Viewer/Left with Full I/O Array) */}
+            <polygon
+              points="28,146 52,172 52,178 28,153"
+              fill="url(#aeroProEdgeWall)"
+              stroke="rgba(255,255,255,0.2)"
+              strokeWidth="0.6"
+            />
+            {/* Diamond-Cut Specular Chamfer Along Top Left Wall Edge */}
+            <line x1="28" y1="146" x2="52" y2="172" stroke="rgba(255,255,255,0.45)" strokeWidth="0.75" />
 
-            {/* Black Anodized Clutch Hinge Cylinder Spanning the Base-to-Lid Joint */}
+            {/* MagSafe 3 Fast-Charge Port with Amber Status LED */}
+            <polygon points="32,150 37,155.5 37,158 32,152.5" fill="#07080a" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <circle cx="34.5" cy="154.5" r="0.8" fill="#fbbf24" style={{ filter: 'drop-shadow(0 0 2px #fbbf24)' }} />
+
+            {/* Dual Thunderbolt 4 / USB-C 40Gb/s Receptacles with Grounding Collars */}
+            <polygon points="39,158 42,161 42,163.5 39,160.5" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <line x1="40" y1="159.5" x2="41" y2="160.5" stroke="#94a3b8" strokeWidth="0.4" />
+            <polygon points="44,163.5 47,166.5 47,169 44,166" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <line x1="45" y1="165" x2="46" y2="166" stroke="#94a3b8" strokeWidth="0.4" />
+
+            {/* 3.5mm High-Impedance Pro Audio Jack with Gold Contact Ring */}
+            <ellipse cx="49" cy="172.5" rx="1.1" ry="0.9" fill="#040507" stroke="#fbbf24" strokeWidth="0.3" />
+
+            {/* Rear Spine Wall (Under Hinge Line) */}
+            <polygon
+              points="28,146 208,132 208,138 28,153"
+              fill="#141519"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.5"
+            />
+            {/* Specular Bottom Lip Along Lower Chassis Base */}
+            <line x1="28" y1="153" x2="208" y2="138" stroke="rgba(255,255,255,0.3)" strokeWidth="0.6" />
+
+            {/* Precision Thermal Exhaust Louvers Tucked Under Hinge */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <line
+                key={`ex-l-${i}`}
+                x1={38 + i * 2.8}
+                y1={148 - i * 0.22}
+                x2={38 + i * 2.8}
+                y2={151 - i * 0.22}
+                stroke="#07080a"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+              />
+            ))}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <line
+                key={`ex-r-${i}`}
+                x1={162 + i * 2.8}
+                y1={138.5 - i * 0.22}
+                x2={162 + i * 2.8}
+                y2={141.5 - i * 0.22}
+                stroke="#07080a"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+              />
+            ))}
+
+            {/* Central Cylindrical Barrel Clutch Hinge Barrel */}
             <rect
-              x="45"
-              y="144"
-              width="142"
-              height="6.5"
+              x="76"
+              y="137"
+              width="82"
+              height="6"
               rx="2.5"
-              fill="#090d16"
-              stroke="#1e293b"
-              strokeWidth="0.8"
-              transform="rotate(-5.5 45 144)"
+              fill="url(#aeroProHingeGrad)"
+              stroke="rgba(255,255,255,0.2)"
+              strokeWidth="0.6"
+              transform="rotate(-4.5 76 137)"
             />
-            <line x1="58" y1="145" x2="175" y2="134" stroke="#334155" strokeWidth="1" strokeDasharray="3 2" opacity="0.6" />
+            <rect
+              x="77"
+              y="137"
+              width="8"
+              height="6"
+              rx="1.2"
+              fill="#242730"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="0.5"
+              transform="rotate(-4.5 77 137)"
+            />
+            <rect
+              x="149"
+              y="137"
+              width="8"
+              height="6"
+              rx="1.2"
+              fill="#242730"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="0.5"
+              transform="rotate(-4.5 77 137)"
+            />
 
-            {/* ------------------------------------------------------------- */}
-            {/* 3D Tilted Display Lid (Back Facing Camera, Screen Facing Ayesha) */}
-            {/* ------------------------------------------------------------- */}
-            {/* Sliver of Active Screen Glow Visible Around Right/Top Rim Facing Ayesha */}
+            {/* 5. 16″ CNC UNIBODY DISPLAY LID (TRUE 16:10 PERSPECTIVE PROPORTIONS) */}
+            {/* Active Retina Screen Glowing Rim (Facing Inward to Ayesha) */}
             <polygon
-              points="162,2 166,4 189,134 185,133"
-              fill="#7dd3fc"
+              points="210,36 213,36 209,132 206,132"
+              fill="#38bdf8"
               opacity="0.9"
+              style={{ filter: 'drop-shadow(1px 0 3px #38bdf8)' }}
             />
-            <line x1="164" y1="3" x2="188" y2="134" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="211.5" y1="36" x2="207.5" y2="132" stroke="#e0f2fe" strokeWidth="1.2" strokeLinecap="round" />
 
-            {/* 3D Top & Left Chamfered Metallic Edge Bevels */}
+            {/* 3D Top Diamond-Cut Chamfer Bevel Lip */}
             <polygon
-              points="20,18 162,2 165,4 23,20"
+              points="41,47 212,35 212,37 42,49"
               fill="#f8fafc"
-              stroke="#64748b"
-              strokeWidth="0.7"
+              opacity="0.85"
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth="0.5"
             />
+            {/* 3D Left Profile Edge Lip */}
             <polygon
-              points="20,18 23,20 46,150 43,148"
-              fill="#cbd5e1"
-              stroke="#475569"
-              strokeWidth="0.7"
+              points="41,47 43,49 29,147 27,145"
+              fill="#383d47"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="0.5"
             />
 
-            {/* Main Brushed Anodized Aluminum Lid Back Surface (Facing Viewer) */}
+            {/* Main Space Black Anodized Back Lid Surface */}
             <polygon
-              points="22,19 164,3 186,133 44,149"
-              fill="url(#laptopLid3D)"
-              stroke="#64748b"
+              points="42,48 212,36 208,132 28,146"
+              fill="url(#aeroProLidGrad)"
+              stroke="#2b2f38"
               strokeWidth="1.2"
             />
 
-            {/* Subtle Diagonal Specular Window Sunlight Sheen Across Brushed Metal Lid */}
+            {/* Path-Traced Anisotropic Sunlight / Window Glare Sweep Across Back Lid */}
             <polygon
-              points="42,16 96,9 138,138 84,145"
+              points="58,47 114,43 148,136 92,141"
               fill="#ffffff"
-              opacity="0.22"
+              opacity="0.14"
             />
             <polygon
-              points="104,8 126,5 164,136 144,138"
-              fill="#ffffff"
-              opacity="0.12"
+              points="126,42 152,40 184,134 158,136"
+              fill="#38bdf8"
+              opacity="0.08"
             />
 
-            {/* Chamfered Specular Hairline Around Lid Perimeter */}
+            {/* 0.8mm Diamond Chamfer Specular Inner Hairline */}
             <polygon
-              points="24,20.5 162,5 183.5,131.5 45.5,147"
+              points="43.5,49.5 210.5,37.8 206.5,130.5 30,144.5"
               fill="none"
-              stroke="#f1f5f9"
+              stroke="rgba(255, 255, 255, 0.38)"
               strokeWidth="0.7"
-              opacity="0.65"
             />
 
-            {/* Polished Mirror-Chrome / Backlit Emblem Centered on Lid Back */}
-            <g transform="translate(105, 68) rotate(-6) skewX(8)">
-              {/* Outer Glowing Emblem Bevel */}
-              <circle
+            {/* Rear Spine Hinge Seam & Micro-Milled Antenna Line */}
+            <line
+              x1="38"
+              y1="142"
+              x2="198"
+              y2="129"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="0.75"
+              strokeDasharray="14 3 60 3 14"
+            />
+
+            {/* Left & Right Hinge Clutch Cutout Notches */}
+            <polygon points="52,141 64,140 64,143 52,144" fill="#090a0d" stroke="rgba(255,255,255,0.18)" strokeWidth="0.4" />
+            <polygon points="172,131.5 184,130.5 184,133.5 172,134.5" fill="#090a0d" stroke="rgba(255,255,255,0.18)" strokeWidth="0.4" />
+
+            {/* ------------------------------------------------------------- */}
+            {/* OFFICIAL RASAI EMBLEM CENTERED ON BACK LID (NO OTHER TEXT)    */}
+            {/* ------------------------------------------------------------- */}
+            <g transform="translate(122, 90)">
+              {/* Subtle Specular Aura around Recessed Pocket */}
+              <ellipse cx="0" cy="0" rx="16" ry="14" fill="#38bdf8" opacity="0.12" style={{ filter: 'blur(3px)' }} />
+              {/* 0.4mm Recessed CNC Pocket Bezel Ring */}
+              <ellipse
                 cx="0"
                 cy="0"
-                r="13"
-                fill="#0f172a"
-                fillOpacity="0.25"
-                stroke="#f8fafc"
-                strokeWidth="1.2"
+                rx="15"
+                ry="13.5"
+                fill="#090a0d"
+                stroke="rgba(255,255,255,0.22)"
+                strokeWidth="0.75"
+                transform="rotate(-4.2) skewX(7)"
               />
-              {/* Polished Chrome Diamond/Compass Emblem Core */}
-              <polygon
-                points="0,-9 8,0 0,9 -8,0"
-                fill="#f8fafc"
-                stroke="#bae6fd"
-                strokeWidth="0.8"
-              />
-              <polygon
-                points="0,-5 4.5,0 0,5 -4.5,0"
-                fill="#38bdf8"
-                opacity="0.85"
-              />
-              {/* Top Leaf/Accent */}
-              <path d="M 1 -10 C 4 -14, 8 -14, 7 -10 C 5 -8, 2 -8, 1 -10 Z" fill="#f8fafc" />
+
+              {/* Exact Scaled & Perspective-Aligned Rasai Geometric Emblem */}
+              <g transform="rotate(-4.2) skewX(7) scale(0.026) translate(-668, -337)">
+                <path d={LOGO_PATHS.bodyOuter.d} fill="url(#rasaiLidChromeOuter)" />
+                {LOGO_PATHS.bodyOuter.bevels.map((b, i) => (
+                  <path key={`lid-bo-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
+                ))}
+
+                <path d={LOGO_PATHS.bodyInner.d} fill="url(#rasaiLidChromeInner)" />
+
+                <path d={LOGO_PATHS.bodyLower.d} fill="url(#rasaiLidChromeLower)" />
+                {LOGO_PATHS.bodyLower.bevels.map((b, i) => (
+                  <path key={`lid-bl-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
+                ))}
+
+                <path d={LOGO_PATHS.arrow.d} fill="url(#rasaiLidChromeArrow)" />
+                {LOGO_PATHS.arrow.bevels.map((b, i) => (
+                  <path key={`lid-ar-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
+                ))}
+              </g>
+
+              {/* Path-Traced Specular Glint Across Chrome Emblem */}
+              <line x1="-8" y1="-4" x2="8" y2="10" stroke="#ffffff" strokeWidth="0.65" opacity="0.75" transform="rotate(-4.2)" />
             </g>
           </g>
 

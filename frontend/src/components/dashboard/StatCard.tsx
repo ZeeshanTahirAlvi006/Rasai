@@ -21,9 +21,9 @@ export const StatCard: React.FC<StatCardProps> = ({
   const isVeryLong = value.length > 12;
 
   const valueFontSize = isVeryLong
-    ? 'text-lg sm:text-xl xl:text-2xl'
-    : isLong
     ? 'text-xl sm:text-2xl xl:text-3xl'
+    : isLong
+    ? 'text-2xl sm:text-3xl xl:text-4xl'
     : 'text-3xl sm:text-4xl xl:text-5xl';
 
   return (
@@ -71,13 +71,13 @@ export const StatCard: React.FC<StatCardProps> = ({
         </motion.div>
 
         {/* Label */}
-        <div className="mt-2.5 text-xs font-bold uppercase tracking-wider text-neutral-300">
+        <div className="mt-3 text-sm sm:text-base font-bold uppercase tracking-wider text-neutral-100">
           {label}
         </div>
 
         {/* Subtext */}
         {subtext && (
-          <div className="mt-1 text-[10px] font-mono text-neutral-400 tracking-tight">
+          <div className="mt-1.5 text-xs sm:text-[13px] font-mono text-neutral-300 font-medium tracking-normal">
             {subtext}
           </div>
         )}

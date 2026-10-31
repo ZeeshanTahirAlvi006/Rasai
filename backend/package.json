@@ -10,7 +10,10 @@
     "redis:stop": "docker stop ndr-redis",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:index:sync": "tsx src/scripts/syncIndexes.ts"
+    "db:index:sync": "tsx src/scripts/syncIndexes.ts",
+    "db:seed": "tsx src/scripts/seedDemoData.ts",
+    "seed": "tsx src/scripts/seedDemoData.ts",
+    "test:whatsapp": "tsx src/scripts/testWhatsApp.ts"
   },
   "config": {
     "mongodbMemoryServer": {

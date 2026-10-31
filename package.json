@@ -8,6 +8,7 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "redis:start": "npm --prefix backend run redis:start",
-    "redis:stop": "npm --prefix backend run redis:stop"
+    "redis:stop": "npm --prefix backend run redis:stop",
+    "test:whatsapp": "npm --prefix backend run test:whatsapp --"
   }
 }
