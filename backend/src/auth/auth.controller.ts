@@ -1,3 +1,5 @@
+// src/auth/auth.controller.ts
+// Thin Express controller for user registration, authentication, token refresh, and session management.
 import { Request, Response } from "express"
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { AppError } from "../middleware/error.js"

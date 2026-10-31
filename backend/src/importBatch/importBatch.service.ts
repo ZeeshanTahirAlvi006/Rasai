@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.service.ts
+// Service for tracking event CSV import batches: S3 presigning, commit triggering, and progress tracking.
 import { Types } from 'mongoose';
 import { ImportBatch, type IImportBatch, type ImportBatchStatus } from './ImportBatch.model.js';
 import { getPresignedUploadUrl } from '../config/s3.js';
@@ -125,7 +127,7 @@ export async function commitImportBatchService(
   const updated = await ImportBatch.findOneAndUpdate(
     { _id: batchId, merchantId, status: 'PENDING_UPLOAD' },
     { $set: { status: 'NORMALIZING' } },
-    { new: true },
+    { returnDocument: 'after' },
   ).exec();
 
   if (!updated) {
@@ -140,23 +142,23 @@ export async function commitImportBatchService(
     );
   }
 
-  // Queue normalize-csv-stream job
-  try {
-    const queue = getBulkImportQueue();
-    await queue.add(
-      'normalize-csv-stream',
-      { batchId: batchId.toString() },
-      {
-        jobId: `normalize_${batchId.toString()}`,
-        removeOnComplete: true,
-        removeOnFail: false,
-      },
-    );
-  } catch (err: any) {
-    // If Redis is not connected or in test mode without workers, execute inline fallback
-    if (process.env.NODE_ENV === 'test') {
-      await processNormalizeCsvStream(batchId);
-    } else {
+  // In test environment without background queue worker, normalize inline
+  if (process.env.NODE_ENV === 'test' && !process.env.FORCE_REAL_REDIS) {
+    await processNormalizeCsvStream(batchId);
+  } else {
+    // Queue normalize-csv-stream job
+    try {
+      const queue = getBulkImportQueue();
+      await queue.add(
+        'normalize-csv-stream',
+        { batchId: batchId.toString() },
+        {
+          jobId: `normalize_${batchId.toString()}`,
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      );
+    } catch (err: any) {
       console.error(`[ImportService] Failed to enqueue normalizer job:`, err?.message);
     }
   }
@@ -196,7 +198,7 @@ export async function getImportBatchStatusService(
 
   const batch = await ImportBatch.findOne({ _id: batchId, merchantId })
     .select(
-      '_id carrier filename status totalChunks completedChunks failedChunks rowCount applied duplicates rejected noop unknownShipments errors fatalError createdAt completedAt',
+      '_id carrier filename status totalChunks completedChunks failedChunks rowCount applied duplicates rejected noop unknownShipments fatalError createdAt completedAt',
     )
     .lean()
     .exec();
@@ -267,7 +269,7 @@ export async function listImportBatchesService(
     .sort({ _id: -1 })
     .limit(limit + 1)
     .select(
-      '_id carrier filename status totalChunks completedChunks failedChunks rowCount applied duplicates rejected noop unknownShipments errors fatalError createdAt completedAt',
+      '_id carrier filename status totalChunks completedChunks failedChunks rowCount applied duplicates rejected noop unknownShipments fatalError createdAt completedAt',
     )
     .lean()
     .exec();

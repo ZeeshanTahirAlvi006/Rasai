@@ -37,7 +37,7 @@ export const Chapter03Doorstep: React.FC = () => {
             <span>03 / 05 • LAHORE URBAN SECTOR • 09:45 AM</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-5xl font-normal leading-[1.08] text-white tracking-tight">
+          <h2 className="font-sans text-3xl sm:text-5xl font-bold leading-[1.08] text-white tracking-tight">
             The Doorstep Intercept: Halting Rider Fraud
           </h2>
 

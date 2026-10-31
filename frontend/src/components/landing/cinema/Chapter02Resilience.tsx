@@ -68,7 +68,7 @@ export const Chapter02Resilience: React.FC = () => {
             <span>02 / 05 • NATIONAL TRANSIT ARTERIES</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-5xl font-normal leading-[1.08] text-white tracking-tight">
+          <h2 className="font-sans text-3xl sm:text-5xl font-bold leading-[1.08] text-white tracking-tight">
             Carrier API Resilience & Circuit Breakers
           </h2>
 

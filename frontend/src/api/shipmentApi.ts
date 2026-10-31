@@ -1,5 +1,8 @@
 // src/api/shipmentApi.ts
+// src/api/shipmentApi.ts
+// Typed API client for parcel lifecycle operations: bulk ingestion, queries, optimistic updates, and cancellation.
 import API from './api';
+import { recordLog } from './telemetry';
 import type {
   BulkCreateRowInput,
   BulkCreateResponse,
@@ -13,26 +16,8 @@ import type {
   IShipment,
 } from '../types/shipment';
 
-// Global log listener for the API Inspector tab
-type LogListener = (entry: ApiCallLogEntry) => void;
-const logListeners: Set<LogListener> = new Set();
-
-export const onApiCallLogged = (listener: LogListener): (() => void) => {
-  logListeners.add(listener);
-  return () => {
-    logListeners.delete(listener);
-  };
-};
-
-export function recordLog(entry: ApiCallLogEntry) {
-  logListeners.forEach((fn) => {
-    try {
-      fn(entry);
-    } catch (e) {
-      console.error('Log listener error:', e);
-    }
-  });
-}
+// Re-export telemetry primitives from centralized hub for backwards compatibility (B3-FE-02)
+export { recordLog, onApiCallLogged, type ApiCallLogEntry } from './telemetry';
 
 /**
  * Bulk ingestion of up to 500 shipments (POST /api/shipments/bulk)

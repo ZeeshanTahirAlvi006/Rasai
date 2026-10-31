@@ -1,3 +1,5 @@
+// src/importBatch/ImportBatch.model.ts
+// Mongoose schema and model for bulk tracking event import batches with chunk tracking and error capture.
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { Carrier } from '../types/index.js';
 
@@ -136,6 +138,7 @@ const importBatchSchema = new Schema<IImportBatch>(
   {
     timestamps: { createdAt: true, updatedAt: true },
     collection: 'import_batches',
+    suppressReservedKeysWarning: true, // Suppresses Mongoose warning on 'errors' array field (B2-WARN-01)
   },
 );
 

@@ -129,15 +129,18 @@ export interface ApiEnvelope<T> {
 }
 
 export interface ApiCallLogEntry {
-  id: string;
+  id?: string;
   timestamp: string;
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | string;
   endpoint: string;
   status: number;
   durationMs: number;
   requestBody?: unknown;
   responseBody?: unknown;
-  isError: boolean;
+  isError?: boolean;
+  payload?: any;
+  response?: any;
+  error?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────

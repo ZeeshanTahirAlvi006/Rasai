@@ -1,3 +1,5 @@
+// src/utils/bulkSemaphore.ts
+// Leased merchant-level concurrency semaphore with Redis Lua/pipeline and in-memory test fallback.
 import IORedis from 'ioredis';
 import { getRedisClient } from '../config/redis.js';
 
@@ -198,6 +200,7 @@ export async function withMerchantBulkLease<T>(
       console.warn(`[BulkSemaphore] Failed to refresh lease for ${merchantId}:${chunkId}:`, err?.message);
     }
   }, heartbeatIntervalMs);
+  heartbeatTimer.unref?.(); // Spec §3.3: unref background heartbeat timer so it does not block clean shutdown (B2-ML-02)
 
   try {
     const result = await fn();

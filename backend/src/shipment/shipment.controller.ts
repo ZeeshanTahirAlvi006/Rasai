@@ -1,4 +1,5 @@
 // src/shipment/shipment.controller.ts
+// Thin Express controller for parcel ingestion, query pagination, metadata patching, and cancellation.
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import {
@@ -15,15 +16,8 @@ export const bulkCreateShipmentsController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
     const { shipments } = req.body;
-
     const result = await bulkCreateShipmentsService(merchantId, shipments);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -32,15 +26,8 @@ export const listShipmentsController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
     const filter = (res.locals.query || req.query) as ListShipmentsFilter;
-
     const result = await listShipmentsService(merchantId, filter);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -48,16 +35,9 @@ export const listShipmentsController = asyncHandler(
 export const getShipmentController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const id = req.params.id as string;
-
+    const id = String(req.params.id);
     const result = await getShipmentService(merchantId, id);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -65,17 +45,10 @@ export const getShipmentController = asyncHandler(
 export const updateShipmentController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const id = req.params.id as string;
+    const id = String(req.params.id);
     const { expectedVersion, ...patch } = req.body;
-
     const result = await updateShipmentService(merchantId, id, expectedVersion, patch);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -83,16 +56,9 @@ export const updateShipmentController = asyncHandler(
 export const cancelShipmentController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const id = req.params.id as string;
-
+    const id = String(req.params.id);
     const result = await cancelShipmentService(merchantId, id);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 

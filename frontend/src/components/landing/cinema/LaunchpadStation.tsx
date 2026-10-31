@@ -36,7 +36,7 @@ export const LaunchpadStation: React.FC = () => {
             <span>FINAL STOP • COD MARGIN RECOVERY CALCULATOR</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-5xl font-normal leading-[1.08] text-white tracking-tight">
+          <h2 className="font-sans text-3xl sm:text-5xl font-bold leading-[1.08] text-white tracking-tight">
             Stop Bleeding Margins on Ghost Delivery Attempts
           </h2>
 
@@ -116,7 +116,7 @@ export const LaunchpadStation: React.FC = () => {
                 <LayoutDashboard className="w-4 h-4 text-[#c9a47a]" />
                 Live Sandbox Console
               </div>
-              <h3 className="font-serif text-xl text-white mb-2 font-normal">
+              <h3 className="font-sans text-xl text-white mb-2 font-bold">
                 Inspect Real-Time NDR Telemetry
               </h3>
               <p className="font-sans text-xs text-[#f4efe8]/70 leading-relaxed font-light mb-4">
@@ -140,7 +140,7 @@ export const LaunchpadStation: React.FC = () => {
                 <UserPlus className="w-4 h-4 text-[#c9a47a]" />
                 Pilot Program Access
               </div>
-              <h3 className="font-serif text-xl text-white mb-2 font-normal">
+              <h3 className="font-sans text-xl text-white mb-2 font-bold">
                 Deploy Rasai for Your Store
               </h3>
               <p className="font-sans text-xs text-[#f4efe8]/70 leading-relaxed font-light mb-4">

@@ -1,3 +1,5 @@
+// src/shipment/shipment.service.ts
+// Core parcel lifecycle service: bulk ingestion, optimistic updates, queries, and engine delegation.
 import { Types } from 'mongoose';
 import { Shipment, type IShipment } from './shipment.model.js';
 import { ShipmentEvent } from '../shipmentEvent/ShipmentEvent.model.js';
@@ -277,6 +279,9 @@ export async function listShipmentsService(
   const docs = await Shipment.find(query)
     .sort({ _id: -1 })
     .limit(limit + 1)
+    .select(
+      '_id merchantId carrier trackingNumber status stateVersion orderValueCOD customerPhone customerPhoneHash destinationStationCode rescheduledDate customerCoordinates ndrAttempt lastPolledAt needsManifest lastManifestedAt createdAt updatedAt',
+    )
     .lean<IShipment[]>()
     .exec();
 
@@ -309,6 +314,9 @@ export async function getShipmentService(
     _id: new Types.ObjectId(id),
     merchantId,
   })
+    .select(
+      '_id merchantId carrier trackingNumber status stateVersion orderValueCOD customerPhone customerPhoneHash destinationStationCode rescheduledDate customerCoordinates ndrAttempt lastPolledAt needsManifest lastManifestedAt createdAt updatedAt',
+    )
     .lean<IShipment>()
     .exec();
 
@@ -322,6 +330,7 @@ export async function getShipmentService(
     trackingNumber: shipment.trackingNumber,
   })
     .sort({ occurredAt: 1 })
+    .select('_id eventKey carrier trackingNumber source rawStatus rawRemarks occurredAt disposition batchId payload createdAt')
     .lean()
     .exec();
 
@@ -493,53 +502,48 @@ export async function cancelShipmentService(
 // Selects shipments due for a status poll using index idx_poller_carrier_selection or idx_poller_selection.
 export async function selectDueForPoll(
   carrier: Carrier,
-  status: Status,
+  status: Status | Status[],
   olderThan: Date,
   limit?: number,
 ): Promise<IShipment[]>;
 export async function selectDueForPoll(
-  status: Status,
+  status: Status | Status[],
   olderThan: Date,
   limit?: number,
 ): Promise<IShipment[]>;
 export async function selectDueForPoll(
-  arg1: Carrier | Status,
-  arg2: Status | Date,
+  arg1: Carrier | Status | Status[],
+  arg2: Status | Status[] | Date,
   arg3?: Date | number,
   arg4 = 100,
 ): Promise<IShipment[]> {
   let query: Record<string, unknown>;
   let limit = 100;
 
-  if (typeof arg2 === 'string') {
+  if (typeof arg2 === 'string' || Array.isArray(arg2)) {
     const carrier = arg1 as Carrier;
-    const status = arg2 as Status;
+    const status = arg2 as Status | Status[];
     const olderThan = (arg3 as Date) || new Date();
     limit = typeof arg4 === 'number' ? arg4 : 100;
     query = {
       carrier,
-      status,
-      $or: [
-        { lastPolledAt: { $lt: olderThan } },
-        { lastPolledAt: null },
-      ],
+      status: Array.isArray(status) ? { $in: status } : status,
+      lastPolledAt: { $lt: olderThan },
     };
   } else {
-    const status = arg1 as Status;
+    const status = arg1 as Status | Status[];
     const olderThan = (arg2 as Date) || new Date();
     limit = typeof arg3 === 'number' ? arg3 : 100;
     query = {
-      status,
-      $or: [
-        { lastPolledAt: { $lt: olderThan } },
-        { lastPolledAt: null },
-      ],
+      status: Array.isArray(status) ? { $in: status } : status,
+      lastPolledAt: { $lt: olderThan },
     };
   }
 
   return Shipment.find(query)
     .sort({ lastPolledAt: 1 })
     .limit(limit)
+    .select('_id merchantId carrier trackingNumber status lastPolledAt orderValueCOD')
     .lean<IShipment[]>()
     .exec();
 }
@@ -551,6 +555,9 @@ export async function findOpenByPhoneHash(phoneHash: string): Promise<IShipment 
     status: { $nin: Array.from(TERMINAL) },
   })
     .sort({ _id: -1 })
+    .select(
+      '_id merchantId carrier trackingNumber status stateVersion orderValueCOD customerPhone customerPhoneHash destinationStationCode rescheduledDate customerCoordinates ndrAttempt lastPolledAt needsManifest lastManifestedAt createdAt updatedAt',
+    )
     .lean<IShipment>()
     .exec();
 }

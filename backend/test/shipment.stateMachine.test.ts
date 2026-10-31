@@ -119,7 +119,7 @@ describe('shipment.stateMachine (decide)', () => {
   describe('Non-Carrier Intents', () => {
     const futureDate = new Date('2026-10-15T10:00:00Z');
 
-    it('applies CUSTOMER_RESCHEDULE from NDR_ACTIVE with MARK_NEEDS_MANIFEST', () => {
+    it('applies CUSTOMER_RESCHEDULE from NDR_ACTIVE with MARK_NEEDS_MANIFEST and confirmation (B3-BUG-02)', () => {
       const decision = decide(
         'NDR_ACTIVE',
         { kind: 'CUSTOMER_RESCHEDULE', date: futureDate },
@@ -127,7 +127,7 @@ describe('shipment.stateMachine (decide)', () => {
       );
       expect(decision.disposition).toBe('APPLIED');
       expect(decision.next).toBe('RESOLVED_RESCHEDULED');
-      expect(decision.effects).toEqual(['MARK_NEEDS_MANIFEST']);
+      expect(decision.effects).toEqual(['MARK_NEEDS_MANIFEST', 'ENQUEUE_RESCHEDULE_CONFIRMATION']);
     });
 
     it('applies CUSTOMER_RESCHEDULE from RTO_INITIATED preserving state and setting MARK_NEEDS_MANIFEST', () => {

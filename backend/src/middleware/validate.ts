@@ -1,3 +1,5 @@
+// src/middleware/validate.ts
+// Express middleware for Zod schema validation of request params, query, body, and headers.
 import { Request, Response, NextFunction } from "express"
 import { z, ZodObject } from 'zod'
 

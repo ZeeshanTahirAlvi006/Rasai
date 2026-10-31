@@ -15,6 +15,8 @@ export interface IOutboxMessage extends Document {
   status: OutboxStatus;
   scheduledFor: Date;
   leaseUntil?: Date;
+  leaseVersion: number;
+  relayClaimToken?: Types.ObjectId;
   attempts: number;
   providerMessageId?: string;
   lastError?: { code?: number; message: string };
@@ -82,6 +84,15 @@ const outboxMessageSchema = new Schema<IOutboxMessage>(
       type: Date,
       default: undefined,
     },
+    leaseVersion: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    relayClaimToken: {
+      type: Schema.Types.ObjectId,
+      default: undefined,
+    },
     attempts: {
       type: Number,
       required: true,
@@ -139,14 +150,20 @@ outboxMessageSchema.index(
   { name: 'idx_outbox_shipment_type_status' },
 );
 
-// 5. 14-day TTL index to automatically purge terminal messages
+// 5. 90-day TTL index to automatically purge terminal messages (B2-ML-04)
 outboxMessageSchema.index(
   { updatedAt: 1 },
   {
-    expireAfterSeconds: 14 * 86400,
-    partialFilterExpression: { status: { $in: ['DISPATCHED', 'DISCARDED_STALE'] } },
+    expireAfterSeconds: 90 * 86400,
+    partialFilterExpression: { status: { $in: ['DISPATCHED', 'DISCARDED_STALE', 'FAILED'] } },
     name: 'ttl_outbox_terminal_cleanup',
   },
+);
+
+// 6. Vectorized bulk claim verification index (B2-BN-01)
+outboxMessageSchema.index(
+  { relayClaimToken: 1, status: 1 },
+  { name: 'idx_outbox_relay_claim_token', sparse: true },
 );
 
 export const OutboxMessage = mongoose.model<IOutboxMessage>('OutboxMessage', outboxMessageSchema);

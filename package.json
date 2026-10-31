@@ -1,0 +1,13 @@
+{
+  "name": "ndr-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NDR Project Workspace",
+  "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "redis:start": "npm --prefix backend run redis:start",
+    "redis:stop": "npm --prefix backend run redis:stop"
+  }
+}

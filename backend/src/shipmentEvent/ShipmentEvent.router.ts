@@ -1,3 +1,5 @@
+// src/shipmentEvent/ShipmentEvent.router.ts
+// Express router defining protected endpoints for single and bulk tracking event ingestion, queries, and metrics.
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { validate } from '../middleware/validate.js';

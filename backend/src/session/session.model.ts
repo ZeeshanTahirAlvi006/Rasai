@@ -1,12 +1,17 @@
-import mongoose, { Schema } from "mongoose"
-import { Document, Types } from "mongoose"
+// src/session/session.model.ts
+// Mongoose schema and model for authenticated user refresh sessions with 7-day TTL expiration.
+import mongoose, { Schema, Document, Types } from "mongoose";
+
 export interface Session extends Document {
-    userId: Types.ObjectId
-    refreshTokenHash: String,
-    ip: String,
-    userAgent: String,
-    revoked: Boolean
+    userId: Types.ObjectId;
+    refreshTokenHash: string;
+    ip: string;
+    userAgent: string;
+    revoked: boolean;
+    createdAt: Date;
+    updatedAt: Date;
 }
+
 const sessionSchema = new Schema<Session>(
     {
         userId: {
@@ -31,13 +36,15 @@ const sessionSchema = new Schema<Session>(
             required: [true, "revoked is required"],
             default: false
         }
-    }, {
-    timestamps: true
-}
-)
-sessionSchema.index({ refreshTokenHash: 1 }, { unique: true }); //token refresh
-sessionSchema.index({ userId: 1, revoked: 1 });//users active sessions
-sessionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 604800 }) //auto delete expired sessions
+    },
+    {
+        timestamps: true
+    }
+);
 
-const sessionModel = mongoose.model<Session>("Session", sessionSchema)
-export default sessionModel
+sessionSchema.index({ refreshTokenHash: 1 }, { unique: true }); // Token refresh index
+sessionSchema.index({ userId: 1, revoked: 1 }); // User's active sessions index
+sessionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 604800 }); // Auto-delete expired sessions after 7 days (Spec §3.4)
+
+const sessionModel = mongoose.model<Session>("Session", sessionSchema);
+export default sessionModel;

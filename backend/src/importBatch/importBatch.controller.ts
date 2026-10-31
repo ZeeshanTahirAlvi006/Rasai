@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.controller.ts
+// Thin Express controller for CSV import batch presigning, commit triggers, status, and history.
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import {

@@ -1,3 +1,5 @@
+// src/shipmentEvent/ShipmentEvent.controller.ts
+// Thin Express controller for audit ledger recording, bulk ingest, query pagination, and timeline synthesis.
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import {
@@ -15,13 +17,7 @@ export const recordShipmentEventController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
     const result = await recordShipmentEventService(merchantId, req.body);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -30,13 +26,7 @@ export const bulkRecordShipmentEventsController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
     const result = await bulkRecordShipmentEventsService(merchantId, req.body);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -46,13 +36,7 @@ export const listShipmentEventsController = asyncHandler(
     const merchantId = req.user!.merchantId;
     const filter = (res.locals.query || req.query) as ListShipmentEventsFilter;
     const result = await listShipmentEventsService(merchantId, filter);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -60,15 +44,10 @@ export const listShipmentEventsController = asyncHandler(
 export const getShipmentTimelineController = asyncHandler(
   async (req: Request, res: Response) => {
     const merchantId = req.user!.merchantId;
-    const { carrier, trackingNumber } = req.params;
-    const result = await getShipmentTimelineService(merchantId, carrier as string, trackingNumber as string);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    const carrier = String(req.params.carrier);
+    const trackingNumber = String(req.params.trackingNumber);
+    const result = await getShipmentTimelineService(merchantId, carrier, trackingNumber);
+    return res.status(result.status).json(result);
   },
 );
 
@@ -78,13 +57,7 @@ export const getLedgerMetricsController = asyncHandler(
     const merchantId = req.user!.merchantId;
     const filter = (res.locals.query || req.query) as LedgerMetricsFilter;
     const result = await getLedgerMetricsService(merchantId, filter);
-    const response = {
-      success: result?.success,
-      message: result?.message,
-      data: result?.data,
-      error: result?.error,
-    };
-    return res.status(result?.status as number).json(response);
+    return res.status(result.status).json(result);
   },
 );
 

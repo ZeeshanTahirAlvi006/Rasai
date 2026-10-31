@@ -1,3 +1,5 @@
+// src/shipmentEvent/ShipmentEvent.service.ts
+// Audit ledger service for immutable tracking event recording, idempotency hashing, queries, and timeline synthesis.
 import { Types } from 'mongoose';
 import {
     CARRIERS,
@@ -808,6 +810,7 @@ export const listShipmentEventsService = async (
     const docs = await ShipmentEvent.find(query)
         .sort({ _id: -1 })
         .limit(limit + 1)
+        .select('_id eventKey carrier trackingNumber source rawStatus rawRemarks occurredAt disposition batchId shipmentId payload createdAt')
         .lean()
         .exec();
 
@@ -888,6 +891,7 @@ export const getShipmentTimelineService = async (
         trackingNumber,
     })
         .sort({ occurredAt: 1 })
+        .select('_id eventKey carrier trackingNumber source rawStatus rawRemarks occurredAt disposition batchId payload createdAt')
         .lean()
         .exec();
     // return if no shipment or event found

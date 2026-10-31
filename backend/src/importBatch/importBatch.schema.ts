@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.schema.ts
+// Zod request validation schemas for CSV import batch presigning, commit, and status endpoints.
 import { z } from 'zod';
 import { CARRIERS } from '../types/index.js';
 

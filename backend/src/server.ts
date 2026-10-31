@@ -1,3 +1,5 @@
+// src/server.ts
+// HTTP server entrypoint, middleware mounting, queue daemon lifecycles, and graceful shutdown.
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,8 +14,18 @@ import carrierRouter from '../src/healthCarrier/carrierHealth.router.js';
 import shipmentRouter from './shipment/shipment.router.js';
 import shipmentEventRouter from './shipmentEvent/ShipmentEvent.router.js';
 import importBatchRouter from './importBatch/importBatch.router.js';
+import outboxRouter from './outbox/outbox.router.js';
+import conversationRouter, { webhookRouter } from './conversation/conversation.router.js';
+import manifestRouter from './manifestBatch/manifest.router.js';
+import disputeRouter from './dispute/dispute.router.js';
 import { initializeAllCarriers } from './healthCarrier/carrierHealth.service.js';
 import { closeBulkImportQueue, startBulkImportWorker } from './importBatch/importBatch.queue.js';
+import { getOutboxQueue, startOutboxWorker, closeOutboxQueue } from './outbox/outbox.queue.js';
+import { startOutboxRelayDaemon, stopOutboxRelayDaemon } from './outbox/outbox.relay.js';
+import { startManifestWorker, scheduleManifestJob, closeManifestQueue } from './manifestBatch/manifest.queue.js';
+import { startCarrierPollerWorker, scheduleCarrierPoller, closeCarrierPoller } from './healthCarrier/index.js';
+import { scheduleDisputeSweeper, closeDisputeQueue } from './dispute/dispute.queue.js';
+import { startDisputeWorker } from './dispute/dispute.worker.js';
 
 const app = express();
 
@@ -21,7 +33,26 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors(buildCorsOptions(config.corsOrigins, config.isProd)));
-app.use(express.json());
+// Preserve raw byte stream for Meta webhook HMAC-SHA256 signature verification (B3-RC-06)
+app.use(
+  express.json({
+    limit: '2mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: '2mb',
+    verify: (req: any, _res, buf) => {
+      if (!req.rawBody) {
+        req.rawBody = buf;
+      }
+    },
+  }),
+);
 
 // Serve static test dashboard
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -34,6 +65,11 @@ app.use('/api/shipment-events', shipmentEventRouter);
 app.use('/api/events', shipmentEventRouter);
 app.use('/api/imports', importBatchRouter);
 app.use('/api/v1/imports', importBatchRouter);
+app.use('/api/outbox', outboxRouter);
+app.use('/api/webhooks', webhookRouter);
+app.use('/api/conversations', conversationRouter);
+app.use('/api/manifests', manifestRouter);
+app.use('/api/disputes', disputeRouter);
 
 // Centralized error handler (must be last middleware)
 app.use(errorHandler);
@@ -45,6 +81,15 @@ async function startServer() {
 
   if (config.nodeEnv !== 'test') {
     startBulkImportWorker();
+    startOutboxWorker();
+    const outboxQueue = getOutboxQueue();
+    startOutboxRelayDaemon(outboxQueue);
+    startManifestWorker();
+    await scheduleManifestJob().catch((err) => console.error('Failed to schedule manifest job:', err));
+    startCarrierPollerWorker();
+    await scheduleCarrierPoller().catch((err) => console.error('Failed to schedule poller:', err));
+    startDisputeWorker();
+    await scheduleDisputeSweeper().catch((err) => console.error('Failed to schedule dispute sweeper:', err));
   }
 
   const server = app.listen(config.port, () => {
@@ -55,7 +100,12 @@ async function startServer() {
     console.log(`Received ${signal}. Gracefully shutting down...`);
     server.close(async () => {
       console.log('HTTP server closed.');
+      await stopOutboxRelayDaemon().catch(() => {});
+      await closeOutboxQueue().catch(() => {});
+      await closeManifestQueue().catch(() => {});
       await closeBulkImportQueue().catch(() => {});
+      await closeCarrierPoller().catch(() => {});
+      await closeDisputeQueue().catch(() => {});
       await closeSharedRedisClient().catch(() => {});
       await disconnectDatabase().catch(() => {});
       console.log('Graceful shutdown complete.');

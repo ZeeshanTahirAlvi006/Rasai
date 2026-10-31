@@ -1,4 +1,6 @@
-import axios ,{type AxiosInstance} from "axios"
+// src/api/api.ts
+// Central Axios HTTP client with single-flight refresh token mutex and Bearer auth injection.
+import axios, { type AxiosInstance } from "axios";
 
 let memoryToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('ndr_access_token') : null;
 
@@ -34,10 +36,12 @@ API.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+// Single-flight refresh token mutex: coalesces concurrent 401s into a single refresh request (RC-AUTH-02)
+let activeRefreshPromise: Promise<string | null> | null = null;
+
 API.interceptors.response.use(
   (response: any) => response,
   async (error: any) => {
-    // Silent refresh if 401 status and not retrieved yet
     const originalRequest = error.config;
     if (
       error.response?.status === 401 &&
@@ -46,20 +50,39 @@ API.interceptors.response.use(
       !originalRequest?.url?.includes('/login')
     ) {
       originalRequest._retry = true;
+
+      if (!activeRefreshPromise) {
+        activeRefreshPromise = (async () => {
+          try {
+            const res = await API.post('/auth/refresh-token');
+            const newAccessToken = res.data?.data?.accessToken || res.data?.accessToken;
+            if (newAccessToken) {
+              setInMemoryToken(newAccessToken);
+              return newAccessToken;
+            }
+            setInMemoryToken(null);
+            return null;
+          } catch (refreshError) {
+            setInMemoryToken(null);
+            throw refreshError;
+          } finally {
+            activeRefreshPromise = null;
+          }
+        })();
+      }
+
       try {
-        const res = await API.post('/auth/refresh-token');
-        const newAccessToken = res.data?.data?.accessToken || res.data?.accessToken;
-        if (newAccessToken) {
-          setInMemoryToken(newAccessToken);
+        const newAccessToken = await activeRefreshPromise;
+        if (newAccessToken && originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return API(originalRequest);
         }
       } catch (refreshError) {
-        setInMemoryToken(null);
         return Promise.reject(refreshError);
       }
     }
     return Promise.reject(error);
   },
 );
-export default API
+
+export default API;

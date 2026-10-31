@@ -87,7 +87,17 @@ export type Effect = | 'INCREMENT_NDR_ATTEMPT'
   | 'PURGE_PENDING_OUTBOX'
   | 'MARK_NEEDS_MANIFEST'
   | 'CLEAR_NEEDS_MANIFEST'
-  | 'RETRACT_DISPUTE';
+  | 'RETRACT_DISPUTE'
+  // Customer-confirmed reschedule: enqueue the confirmation template (B3-BUG-02)
+  | 'ENQUEUE_RESCHEDULE_CONFIRMATION';
+
+// Conversation states that still accept customer input
+export const ACTIVE_CONVERSATION_STATES: ConversationState[] = [
+  'AWAITING_CHOICE',
+  'AWAITING_DATE',
+  'AWAITING_LOCATION',
+  'CONFIRMING',
+];
 export interface Decision {
   next: Status,
   effects: Effect[],

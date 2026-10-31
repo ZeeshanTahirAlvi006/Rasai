@@ -1,3 +1,5 @@
+// src/auth/auth.service.ts
+// Core authentication services for merchant registration, JWT issuance, atomic refresh token rotation, and sessions.
 import userModel from "../user/user.model.js";
 import sessionModel from "../session/session.model.js";
 import otpModel from "../otp/otp.model.js";
@@ -29,11 +31,19 @@ export const registerService = async (userData: registerData) => {
     const { username, email, password, ip, userAgent } = userData;
     const alreadyRegistered = await userModel.findOne({
         $or: [{ username }, { email }]
-    }).lean()
+    }).select('_id').lean().exec();
     if (alreadyRegistered) {
         throw new AppError(400, "user already exists", "username or email exists");
     }
-    const newUser = await userModel.create({ username, email, password })
+    let newUser;
+    try {
+        newUser = await userModel.create({ username, email, password });
+    } catch (err: any) {
+        if (err?.code === 11000) {
+            throw new AppError(409, "User with this username or email already exists", "user_already_exists");
+        }
+        throw err;
+    }
     const otp = generateOTP()
     const html = getOtpHtml(otp)
     const otpHash = generateCrypto(otp)
@@ -155,33 +165,37 @@ export const getMeService = async (token: string) => {
 
 // refreshAccess token service
 export const refreshAccessTokenService = async (refreshToken: string) => {
-    const token = refreshToken.trim()
-    const decoded = jwt.verify(token as string, config.jwtSecret as string) as unknown as customJwtPayLoad
-    const id = decoded.id
+    const token = refreshToken.trim();
+    const decoded = jwt.verify(token as string, config.jwtSecret as string) as unknown as customJwtPayLoad;
+    const id = decoded.id;
 
-    const refreshTokenHash = generateCrypto(refreshToken)
-    const session = await sessionModel.findOne({
-        refreshTokenHash,
-        revoked: false
-    })
-    if (!session) {
-        throw new AppError(401, "Invalid token", "invalid_token");
-    }
-    const newAccessToken = jwt.sign({
-        id: id,
-        sessionId: session._id
-    }, config.jwtSecret, {
-        expiresIn: "15m"
-    })
+    const refreshTokenHash = generateCrypto(refreshToken);
     const newRefreshToken = jwt.sign({
         id: id,
         jti: crypto.randomUUID()
     }, config.jwtSecret, {
         expiresIn: "7d"
-    })
-    const newRefreshTokenHash = generateCrypto(newRefreshToken)
-    session.refreshTokenHash = newRefreshTokenHash
-    await session.save()
+    });
+    const newRefreshTokenHash = generateCrypto(newRefreshToken);
+
+    // Atomically rotate refresh token hash; fences against concurrent rotation race conditions (RC-AUTH-01)
+    const session = await sessionModel.findOneAndUpdate(
+        { refreshTokenHash, revoked: false },
+        { $set: { refreshTokenHash: newRefreshTokenHash } },
+        { returnDocument: 'after' }
+    ).lean().exec();
+
+    if (!session) {
+        throw new AppError(401, "Invalid or expired refresh token", "invalid_token");
+    }
+
+    const newAccessToken = jwt.sign({
+        id: id,
+        sessionId: session._id
+    }, config.jwtSecret, {
+        expiresIn: "15m"
+    });
+
     return {
         success: true,
         status: 200,
@@ -191,18 +205,23 @@ export const refreshAccessTokenService = async (refreshToken: string) => {
             refreshToken: newRefreshToken
         },
         error: null
-    }
+    };
 }
 
 //log out service
 export const logoutService = async (refreshToken: string) => {
-    const refreshTokenHashed = generateCrypto(refreshToken)
-    const session = await sessionModel.findOneAndUpdate({ refreshTokenHash: refreshTokenHashed, revoked: false }, { $set: { revoked: true } }).lean()
+    const refreshTokenHashed = generateCrypto(refreshToken);
+    const session = await sessionModel.findOneAndUpdate(
+        { refreshTokenHash: refreshTokenHashed, revoked: false },
+        { $set: { revoked: true } },
+        { returnDocument: 'after' }
+    ).lean().exec();
+
     if (!session) {
-        return { success: true, status: 401, message: "already logout", data: null, error: null }
+        return { success: true, status: 200, message: "Session already revoked or logged out", data: null, error: null };
     }
     if (config.nodeEnv === "development") {
-        console.log(session)
+        console.log(session);
     }
     return {
         success: true,
@@ -210,7 +229,7 @@ export const logoutService = async (refreshToken: string) => {
         message: "logout successful",
         data: null,
         error: null
-    }
+    };
 }
 
 //logout all

@@ -1,10 +1,13 @@
+// src/engine/applyEvent.ts
+// Formal finite state transition engine executing ledger insertion, stateVersion fencing, and outbox staging.
 import mongoose, { ClientSession, Types } from 'mongoose';
 import { areTransactionsSupported, setTransactionsSupported } from '../config/database.js';
 import { Shipment, type IShipment } from '../shipment/shipment.model.js';
 import { ShipmentEvent, toEventHashBuffer } from '../shipmentEvent/ShipmentEvent.model.js';
 import { OutboxMessage, type IOutboxMessage } from '../models/OutboxMessage.js';
-import { decide } from '../shipment/shipment.stateMachine.js';
-import type { Carrier, Intent, Disposition, Effect, EventSource, Status } from '../types/index.js';
+import { ConversationSession } from '../models/ConversationSession.js';
+import { decide, isTerminal } from '../shipment/shipment.stateMachine.js';
+import { ACTIVE_CONVERSATION_STATES, type Carrier, type Intent, type Disposition, type Effect, type EventSource, type Status } from '../types/index.js';
 
 export function isTransactionUnsupportedError(err: any): boolean {
     if (!err) return false;
@@ -90,6 +93,13 @@ export async function applyEventDetailed(cmd: ApplyEventCommand): Promise<ApplyE
             const result = await applyInTransaction(cmd, session);
 
             await session.commitTransaction();
+
+            if (result.nextStatus === 'RTO_INITIATED' && result.shipmentId) {
+                import('../dispute/dispute.service.js')
+                    .then((m) => m.evaluateCprDisputeService(String(cmd.merchantId), String(result.shipmentId)))
+                    .catch(() => {});
+            }
+
             return result;
         } catch (err: any) {
             if (session.inTransaction()) {
@@ -151,7 +161,13 @@ export async function applyEventDetailed(cmd: ApplyEventCommand): Promise<ApplyE
 async function applyWithoutTransaction(cmd: ApplyEventCommand): Promise<ApplyEventResult> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-            return await applyInTransaction(cmd, undefined);
+            const result = await applyInTransaction(cmd, undefined);
+            if (result.nextStatus === 'RTO_INITIATED' && result.shipmentId) {
+                import('../dispute/dispute.service.js')
+                    .then((m) => m.evaluateCprDisputeService(String(cmd.merchantId), String(result.shipmentId)))
+                    .catch(() => {});
+            }
+            return result;
         } catch (err: any) {
             const lostEventKeyRace =
                 err?.code === 11000 &&
@@ -324,6 +340,20 @@ async function applyInTransaction(
     }
     if (has('RETRACT_DISPUTE')) {
         set.disputeRetractionRequested = true;
+        import('../utils/opsAlert.js').then((m) => {
+            m.alertOps('DISPUTE_RETRACTION_REQUESTED', {
+                carrier: current.carrier,
+                trackingNumber: current.trackingNumber,
+            }, {
+                severity: 'WARNING',
+                dedupeScope: `${current.carrier}:${current.trackingNumber}`,
+                source: 'state_engine',
+            });
+        }).catch(() => {});
+    }
+    if (decision.next === 'RTO_INITIATED' && !set.settlementCutoff && !current.settlementCutoff) {
+        const days = current.carrier === 'LEOPARDS' ? 14 : current.carrier === 'TRAX' ? 10 : 7;
+        set.settlementCutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     }
     if (has('ENQUEUE_NDR_TEMPLATE')) {
         set.ndrTemplateDispatched = true;
@@ -362,6 +392,12 @@ async function applyInTransaction(
             current,
             'NDR_UTILITY_TEMPLATE',
             `${current._id}:NDR_UTILITY_TEMPLATE:${nextAttempt}`,
+            {
+                trackingNumber: current.trackingNumber,
+                cod: current.orderValueCOD,
+                ndrAttempt: nextAttempt,
+                carrier: current.carrier,
+            },
             session,
         );
     }
@@ -371,6 +407,12 @@ async function applyInTransaction(
             current,
             'RTO_NOTICE',
             `${current._id}:RTO_NOTICE:${nextAttempt}`,
+            {
+                trackingNumber: current.trackingNumber,
+                cod: current.orderValueCOD,
+                ndrAttempt: nextAttempt,
+                carrier: current.carrier,
+            },
             session,
         );
     }
@@ -381,8 +423,42 @@ async function applyInTransaction(
             current,
             'DELIVERY_CORRECTION',
             `${current._id}:DELIVERY_CORRECTION:${nextAttempt}`,
+            {
+                trackingNumber: current.trackingNumber,
+                cod: current.orderValueCOD,
+                ndrAttempt: nextAttempt,
+                carrier: current.carrier,
+            },
             session,
         );
+    }
+
+    if (has('ENQUEUE_RESCHEDULE_CONFIRMATION')) {
+        const rescheduledDateKey = set.rescheduledDate
+            ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(set.rescheduledDate as Date))
+            : 'TBD';
+        await enqueueOutbox(
+            current,
+            'RESCHEDULE_CONFIRMATION',
+            `${current._id}:RESCHEDULE_CONFIRMATION:${nextAttempt}:${rescheduledDateKey}`,
+            {
+                trackingNumber: current.trackingNumber,
+                cod: current.orderValueCOD,
+                ndrAttempt: nextAttempt,
+                carrier: current.carrier,
+                rescheduledDate: rescheduledDateKey,
+            },
+            session,
+        );
+    }
+
+    // Terminate any active customer conversation sessions if shipment moved out or terminal (B3-RC-03)
+    if (has('CLEAR_NEEDS_MANIFEST') || isTerminal(decision.next)) {
+        await ConversationSession.updateMany(
+            { shipmentId: current._id, state: { $in: ACTIVE_CONVERSATION_STATES } },
+            { $set: { state: 'DONE', updatedAt: now } },
+            session ? { session } : undefined,
+        ).catch(() => {});
     }
 
     return {
@@ -398,15 +474,15 @@ async function enqueueOutbox(
     shipment: IShipment,
     messageType: IOutboxMessage['messageType'],
     dedupeKey: string,
+    payload: Record<string, unknown>,
     session?: ClientSession,
 ): Promise<void> {
     const now = new Date();
 
     // Single atomic upsert: reactivates DISCARDED_STALE or inserts PENDING message
-    // If already DISPATCHED, the filter status != 'DISPATCHED' avoids overwrite.
-    // PII (recipientPhone) is not duplicated in OutboxMessage; send worker reads from Shipment.
+    // Guard against overwriting active PROCESSING or already DISPATCHED messages (B2-RC-03)
     await OutboxMessage.updateOne(
-        { dedupeKey, status: { $ne: 'DISPATCHED' } },
+        { dedupeKey, status: { $nin: ['DISPATCHED', 'PROCESSING'] } },
         {
             $set: {
                 status: 'PENDING',
@@ -419,17 +495,15 @@ async function enqueueOutbox(
                 dedupeKey,
                 channel: 'META_WHATSAPP',
                 messageType,
-                payload: {
-                    trackingNumber: shipment.trackingNumber,
-                    cod: shipment.orderValueCOD,
-                },
+                payload,
                 attempts: 0,
+                leaseVersion: 0,
                 priorityScore: shipment.orderValueCOD,
             },
         },
         session ? { upsert: true, session } : { upsert: true },
     ).catch((err: any) => {
-        // If status IS 'DISPATCHED', filter won't match and upsert throws E11000 on dedupeKey — safely ignore
+        // If status is DISPATCHED or PROCESSING, filter won't match and upsert throws E11000 on dedupeKey — safely ignore
         if (err?.code !== 11000) throw err;
     });
 }

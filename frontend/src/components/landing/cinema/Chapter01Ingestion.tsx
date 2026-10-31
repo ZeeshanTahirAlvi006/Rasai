@@ -49,7 +49,7 @@ export const Chapter01Ingestion: React.FC = () => {
             <span>01 / 05 • KARACHI PORT & AIR DISPATCH</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-5xl font-normal leading-[1.08] text-white tracking-tight">
+          <h2 className="font-sans text-3xl sm:text-5xl font-bold leading-[1.08] text-white tracking-tight">
             High-Volume Telemetry & Zero-Waste Ingestion
           </h2>
 

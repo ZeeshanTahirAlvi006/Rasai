@@ -1,3 +1,5 @@
+// src/config/s3.ts
+// AWS S3 client wrapper for presigned URLs, multipart streaming, and gzipped chunk management.
 import {
   S3Client,
   PutObjectCommand,

@@ -1,7 +1,8 @@
-
+// src/otp/otp.utils.ts
+// Verification code generator and HTML email template renderer for merchant OTPs.
 export const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
-}
+};
 
 export const getOtpHtml = (otp: string): string => {
     return `

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import HeroSection from '../components/landing/HeroSection';
-import Scene1Packing from '../components/landing/movie/Scene1Packing';
+import MovieTheater from '../components/landing/movie/MovieTheater';
 import CustomScrollbar from '../components/landing/CustomScrollbar';
 import { useTheme } from '../context/ThemeContext';
 
@@ -21,7 +21,7 @@ export const LandingPage: React.FC = () => {
 
   return (
     <main
-      className={`min-h-screen transition-colors duration-500 ${
+      className={`relative w-full min-h-screen transition-colors duration-500 overflow-x-clip ${
         isDark ? 'bg-[#0b0b0b] text-white' : 'bg-[#0b0b0b] text-white'
       }`}
     >
@@ -31,11 +31,11 @@ export const LandingPage: React.FC = () => {
       {/* Hero Section with Kinetic Emblem and Live Pakistan Clock */}
       <HeroSection
         ctaLabel="WATCH STORY"
-        ctaHref="#movie-scene-1"
+        ctaHref="#movie-theater"
         timezoneLabel="Pakistan"
         timezoneIana="Asia/Karachi"
         navLinks={[
-          { label: 'STORY', href: '#movie-scene-1' },
+          { label: 'STORY', href: '#movie-theater' },
           { label: 'CONSOLE', href: '/dashboard' },
         ]}
       />
@@ -43,8 +43,8 @@ export const LandingPage: React.FC = () => {
       {/* Target anchor for hero scroll down */}
       <div id="next" className="relative -top-2" />
 
-      {/* Full-Screen Pure Scroll-Driven Scene 1: The Packing */}
-      <Scene1Packing />
+      {/* Full-Screen Pure Scroll-Driven Cinematic Story (Scenes 1 & 2) */}
+      <MovieTheater />
     </main>
   );
 };

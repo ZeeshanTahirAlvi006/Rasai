@@ -1,3 +1,4 @@
+// src/types/carrierHealth.ts
 export type Carrier = 'LEOPARDS' | 'POSTEX' | 'TRAX' | 'TCS';
 export type BreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -49,6 +50,61 @@ export interface TrackingData {
   trackingNumber: string;
   trackingHealth: 'HEALTHY' | 'DEGRADED';
   updates: CarrierUpdate[];
+}
+
+export interface PollerTierStats {
+  totalDue: number;
+  statuses: string[];
+  baseIntervalMinutes: number;
+}
+
+export interface SweepTelemetry {
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  carriersAttempted: Carrier[];
+  parcelsPolledCount: number;
+  updatesIngestedCount: number;
+  skippedCircuitOpen: Carrier[];
+  errors: Array<{ carrier: Carrier; message: string }>;
+}
+
+export interface PollerStatusData {
+  tierStats: Record<string, PollerTierStats>;
+  degradedShipmentsCount: number;
+  lastSweep: SweepTelemetry | null;
+}
+
+export interface MerchantCarrierCredentialData {
+  carrier: Carrier;
+  isConfigured: boolean;
+  source: 'DATABASE' | 'ENV' | 'NONE';
+  apiKeyMasked: string;
+  accountNumber: string;
+  webhookEnabled: boolean;
+  simulationMode: boolean;
+  isActive: boolean;
+  updatedAt?: string;
+}
+
+export interface UpsertCarrierCredentialPayload {
+  carrier: Carrier;
+  apiKey?: string;
+  apiSecret?: string;
+  accountNumber?: string;
+  webhookEnabled?: boolean;
+  webhookSecret?: string;
+  simulationMode?: boolean;
+  isActive?: boolean;
+}
+
+export interface CarrierWebhookSimulationPayload {
+  carrier: Carrier;
+  trackingNumber: string;
+  rawStatus: string;
+  rawRemarks?: string;
+  merchantId?: string;
+  occurredAt?: string;
 }
 
 export interface ApiResponse<T = any> {

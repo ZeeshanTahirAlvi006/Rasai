@@ -9,6 +9,11 @@ import {
   Truck,
   RefreshCw,
   Activity,
+  Send,
+  MessageSquare,
+  FileSpreadsheet,
+  Zap,
+  ShieldAlert,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type {
@@ -24,6 +29,11 @@ import BulkIngestionTab from './BulkIngestionTab';
 import MutationTab from './MutationTab';
 import ApiInspectorTab from './ApiInspectorTab';
 import EventLedgerTab from './EventLedgerTab';
+import OutboxTab from './OutboxTab';
+import ConversationsTab from './ConversationsTab';
+import ManifestsTab from './ManifestsTab';
+import CarriersPollerTab from './CarriersPollerTab';
+import DisputesTab from './DisputesTab';
 import ShipmentDetailModal from './ShipmentDetailModal';
 import QuickAuthModal from './QuickAuthModal';
 
@@ -31,7 +41,7 @@ export const ShipmentConsole: React.FC = () => {
   const { accessToken, user } = useAuth();
 
   // Navigation State
-  const [subTab, setSubTab] = useState<'list' | 'events' | 'bulk' | 'mutations' | 'inspector'>('list');
+  const [subTab, setSubTab] = useState<'list' | 'events' | 'bulk' | 'mutations' | 'outbox' | 'conversations' | 'manifests' | 'carriers' | 'disputes' | 'inspector'>('list');
 
   // Shipment Data State
   const [shipments, setShipments] = useState<IShipment[]>([]);
@@ -301,6 +311,78 @@ export const ShipmentConsole: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setSubTab('outbox')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${subTab === 'outbox'
+              ? 'bg-linear-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+        >
+          <Send className="w-4 h-4 text-emerald-400" />
+          <span>Outbox & WhatsApp</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            RELAY & GOVERNOR
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSubTab('conversations')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${subTab === 'conversations'
+              ? 'bg-linear-to-r from-emerald-600 via-teal-600 to-indigo-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+        >
+          <MessageSquare className="w-4 h-4 text-emerald-400" />
+          <span>Conversations</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            ENGINE & SIMULATOR
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSubTab('manifests')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${subTab === 'manifests'
+              ? 'bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 text-purple-400" />
+          <span>07:30 PKT Manifests</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            RUN-SHEETS & TIER 3
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSubTab('carriers')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            subTab === 'carriers'
+              ? 'bg-linear-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-cyan-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <Zap className="w-4 h-4 text-cyan-400" />
+          <span>Carriers & Poller</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            ADAPTIVE & BREAKER
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSubTab('disputes')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            subTab === 'disputes'
+              ? 'bg-linear-to-r from-rose-600 via-amber-600 to-emerald-600 text-white shadow-md shadow-rose-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-400" />
+          <span>Disputes & CPR</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            MARGIN DEFENSE
+          </span>
+        </button>
+
+        <button
           onClick={() => setSubTab('inspector')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${subTab === 'inspector'
               ? 'bg-linear-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30'
@@ -353,6 +435,26 @@ export const ShipmentConsole: React.FC = () => {
             selectedShipmentId={targetShipmentIdForMutation}
             onRefreshList={() => fetchShipmentsList()}
           />
+        )}
+
+        {subTab === 'outbox' && (
+          <OutboxTab />
+        )}
+
+        {subTab === 'conversations' && (
+          <ConversationsTab />
+        )}
+
+        {subTab === 'manifests' && (
+          <ManifestsTab />
+        )}
+
+        {subTab === 'carriers' && (
+          <CarriersPollerTab />
+        )}
+
+        {subTab === 'disputes' && (
+          <DisputesTab />
         )}
 
         {subTab === 'inspector' && (

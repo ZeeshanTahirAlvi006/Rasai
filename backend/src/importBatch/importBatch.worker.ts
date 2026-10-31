@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.worker.ts
+// Vectorized chunk execution worker: executes 5-op batch folding, deduplication, and S3 cleanup.
 import { Types } from 'mongoose';
 import { ImportBatch } from './ImportBatch.model.js';
 import { ImportChunk, type IImportChunk } from './ImportChunk.model.js';
@@ -113,7 +115,7 @@ export async function processImportChunk(chunkIdInput: string | Types.ObjectId):
         const nextChunk = await ImportChunk.findOneAndUpdate(
           { batchId: chunk.batchId, status: 'PENDING' },
           { $set: { status: 'QUEUED' } },
-          { sort: { chunkIndex: 1 }, new: true },
+          { sort: { chunkIndex: 1 }, returnDocument: 'after' },
         ).exec();
 
         if (nextChunk) {
@@ -460,7 +462,7 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
 
       const buildOutboxUpsert = (msgType: string, dedupeKey: string, payload: any) => ({
         updateOne: {
-          filter: { dedupeKey, status: { $ne: 'DISPATCHED' } },
+          filter: { dedupeKey, status: { $nin: ['DISPATCHED', 'PROCESSING'] } },
           update: {
             $set: { status: 'PENDING', scheduledFor: now, updatedAt: now },
             $setOnInsert: {
@@ -471,6 +473,7 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
               messageType: msgType,
               payload,
               attempts: 0,
+              leaseVersion: 0,
               priorityScore: currentShipment.orderValueCOD || 0,
             },
           },
@@ -483,17 +486,28 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
           buildOutboxUpsert(
             'NDR_UTILITY_TEMPLATE',
             `${currentShipment._id}:NDR_UTILITY_TEMPLATE:${netOutbox.enqueueNdrAttempt}`,
-            { trackingNumber: currentShipment.trackingNumber, cod: currentShipment.orderValueCOD },
+            {
+              trackingNumber: currentShipment.trackingNumber,
+              cod: currentShipment.orderValueCOD,
+              ndrAttempt: netOutbox.enqueueNdrAttempt,
+              carrier: currentShipment.carrier,
+            },
           ),
         );
       }
 
       if (netOutbox.enqueueRto) {
+        const rtoAttempt = sim.ndrAttempt;
         parcelOutboxOps.push(
           buildOutboxUpsert(
             'RTO_NOTICE',
-            `${currentShipment._id}:RTO_NOTICE`,
-            { trackingNumber: currentShipment.trackingNumber },
+            `${currentShipment._id}:RTO_NOTICE:${rtoAttempt}`,
+            {
+              trackingNumber: currentShipment.trackingNumber,
+              cod: currentShipment.orderValueCOD,
+              ndrAttempt: rtoAttempt,
+              carrier: currentShipment.carrier,
+            },
           ),
         );
       }
@@ -503,7 +517,12 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
           buildOutboxUpsert(
             'DELIVERY_CORRECTION',
             `${currentShipment._id}:DELIVERY_CORRECTION:${netOutbox.enqueueCorrectionAttempt}`,
-            { trackingNumber: currentShipment.trackingNumber },
+            {
+              trackingNumber: currentShipment.trackingNumber,
+              cod: currentShipment.orderValueCOD,
+              ndrAttempt: netOutbox.enqueueCorrectionAttempt,
+              carrier: currentShipment.carrier,
+            },
           ),
         );
       }
@@ -668,7 +687,7 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
           ? { $push: { errors: { $each: errorsToLog, $slice: 100 } } }
           : {}),
       },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     if (
@@ -679,6 +698,9 @@ async function executeVectorizedChunkWork(chunk: IImportChunk): Promise<void> {
         { _id: batchId, status: 'PROCESSING' },
         { $set: { status: 'COMPLETED', completedAt: new Date() } },
       );
+      if (updatedBatch.s3SourceKey) {
+        await deleteObject(updatedBatch.s3SourceKey).catch(() => {});
+      }
     }
   }
 }

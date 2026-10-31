@@ -1,3 +1,5 @@
+// src/shipment/shipment.stateMachine.ts
+// Pure state machine definitions: allowed transitions, terminal states, and side effects.
 import type { Status, Intent, Effect, Decision } from '../types/index.js';
 
 
@@ -117,9 +119,10 @@ export function decide(
     case 'CUSTOMER_RESCHEDULE': {
       if (isTerminal(current)) return noop;
       if (current === 'NDR_ACTIVE' || current === 'RESOLVED_RESCHEDULED') {
+        // Confirmation is only promised when the carrier can actually honour the date (B3-BUG-02)
         return {
           next: 'RESOLVED_RESCHEDULED',
-          effects: ['MARK_NEEDS_MANIFEST'],
+          effects: ['MARK_NEEDS_MANIFEST', 'ENQUEUE_RESCHEDULE_CONFIRMATION'],
           disposition: 'APPLIED',
         };
       }

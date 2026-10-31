@@ -1,3 +1,5 @@
+// src/auth/auth.router.ts
+// Express router defining public and protected endpoints for authentication, OTP verification, and password resets.
 import { Router } from "express"
 import {
     register,

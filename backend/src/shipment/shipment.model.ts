@@ -171,16 +171,16 @@ shipmentSchema.index(
   { name: 'idx_poller_carrier_selection' },
 );
 
-// 3. Manifest job: find parcels that need a run-sheet, grouped by carrier & station.
+// 3. Manifest job: tenant + carrier + station ordered stream for run-sheets (B3-BN-01).
 shipmentSchema.index(
-  { needsManifest: 1, carrier: 1, destinationStationCode: 1 },
-  { name: 'idx_manifest_selection' },
+  { needsManifest: 1, merchantId: 1, carrier: 1, destinationStationCode: 1, status: 1 },
+  { name: 'idx_manifest_tenant_selection' },
 );
 
-// 4. Conversation lookup by phone hash (WhatsApp inbound).
+// 4. Conversation lookup by phone hash (WhatsApp inbound), newest first (B3-BN-03).
 shipmentSchema.index(
-  { customerPhoneHash: 1, status: 1 },
-  { name: 'idx_phone_hash_status' },
+  { customerPhoneHash: 1, status: 1, updatedAt: -1 },
+  { name: 'idx_phone_hash_status_updated' },
 );
 
 // 5. Merchant dashboard: cursor pagination by _id within a merchant.

@@ -1,3 +1,5 @@
+// src/auth/auth.schema.ts
+// Zod request validation schemas for authentication payloads, OTP verifications, and password updates.
 import { z } from "zod"
 
 // Register function

@@ -1,3 +1,5 @@
+// src/shipmentEvent/ShipmentEvent.model.ts
+// Mongoose schema and model for immutable shipment audit events with binary sha256 dedupe and 90-day TTL.
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { Carrier, EventSource, Disposition } from '../types/index.js';
 import { eventKeyToHash } from '../utils/eventKey.js';

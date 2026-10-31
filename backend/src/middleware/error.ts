@@ -1,3 +1,5 @@
+// src/middleware/error.ts
+// Centralized Express error handler and custom AppError class for standardized HTTP failure envelopes.
 import { Request, Response, NextFunction } from 'express';
 
 export interface AppErrorPayload<T = any> {

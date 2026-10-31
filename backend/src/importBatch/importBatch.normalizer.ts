@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.normalizer.ts
+// Streaming CSV normalizer: reads S3 CSV streams with BOM stripping and partitions into 500-row NDJSON.gz chunks.
 import { parse } from 'csv-parse';
 import { Types } from 'mongoose';
 import { ImportBatch } from './ImportBatch.model.js';
@@ -176,13 +178,6 @@ export async function processNormalizeCsvStream(batchIdInput: string | Types.Obj
     // Flush any remaining rows
     await flushSlice();
 
-    // Source CSV is now safely sliced into chunk objects; free up S3 storage (ML-02)
-    if (batch.s3SourceKey) {
-      await deleteObject(batch.s3SourceKey).catch((err) => {
-        console.warn(`[ImportNormalizer] Failed to delete source S3 file ${batch.s3SourceKey}:`, err);
-      });
-    }
-
     const totalChunks = chunkIndex;
 
     if (totalChunks === 0) {
@@ -197,6 +192,9 @@ export async function processNormalizeCsvStream(batchIdInput: string | Types.Obj
           },
         },
       );
+      if (batch.s3SourceKey) {
+        await deleteObject(batch.s3SourceKey).catch(() => {});
+      }
       return;
     }
 

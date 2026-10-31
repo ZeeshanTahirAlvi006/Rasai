@@ -1,3 +1,5 @@
+// src/shipmentEvent/ShipmentEvent.schema.ts
+// Zod request validation schemas for tracking event ingestion, bulk ingestion, listing, and timeline queries.
 import { z } from 'zod';
 import { CARRIERS } from '../types/index.js';
 

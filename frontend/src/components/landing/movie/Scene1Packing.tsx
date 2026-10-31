@@ -1,16 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { soundEngine } from '../cinema/SoundEngine';
 import TapeDispenserGun from './TapeDispenserGun';
+import Scene2CityRush, { Scene2Handle } from './Scene2CityRush';
+import Scene3Doorstep, { Scene3Handle } from './Scene3Doorstep';
 
-const DIALOGUE_FULL = "Ye Lahore ka urgent COD parcel hai, customer ko kal lazmi milna chahiye.";
+const DIALOGUE_URDU = "Ye Lahore ka urgent COD parcel hai, kal lazmi milna chahiye!";
+const DIALOGUE_EN = "This is an urgent COD parcel for Lahore, must deliver tomorrow!";
 
-export const Scene1Packing: React.FC = () => {
+export interface Scene1Handle {
+  setProgress: (progress: number) => void;
+}
+
+export interface Scene1PackingProps {
+  embedded?: boolean;
+  externalProgress?: number;
+}
+
+export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(({
+  embedded = false,
+  externalProgress,
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<SVGSVGElement>(null);
 
   // Only discrete milestone states trigger React re-renders (0 re-renders during scroll/cursor/drag)
   const [isFullySealed, setIsFullySealed] = useState<boolean>(false);
   const [isWarehouseMounted, setIsWarehouseMounted] = useState<boolean>(() => {
+    if (embedded) return true;
     if (typeof window !== 'undefined') {
       return window.scrollY > 40 || window.location.hash.length > 1;
     }
@@ -32,7 +48,7 @@ export const Scene1Packing: React.FC = () => {
   const isDraggingRef = useRef<boolean>(false);
   const isTouchingRef = useRef<boolean>(false);
   const isProgrammaticScrollRef = useRef<boolean>(false);
-  const isSceneInViewRef = useRef<boolean>(false);
+  const isSceneInViewRef = useRef<boolean>(embedded ? true : false);
   const lastSoundProgressRef = useRef<number>(0);
   const dragStartClientXRef = useRef<number>(0);
   const dragStartProgressRef = useRef<number>(0);
@@ -64,9 +80,20 @@ export const Scene1Packing: React.FC = () => {
   const tapePoly2Ref = useRef<SVGPolygonElement>(null);
   const tapeGunGroupRef = useRef<SVGGElement>(null);
   const speechBubbleGroupRef = useRef<SVGGElement>(null);
-  const speechLine1Ref = useRef<SVGTextElement>(null);
-  const speechLine2TextRef = useRef<SVGTSpanElement>(null);
-  const speechCursorRef = useRef<SVGTSpanElement>(null);
+  const speechLine1Ref = useRef<HTMLParagraphElement>(null);
+  const speechLine2TextRef = useRef<HTMLSpanElement>(null);
+  const speechCursorRef = useRef<HTMLSpanElement>(null);
+
+  // Scene 2, Scene 3 & Match Cut direct DOM refs
+  const scene2Ref = useRef<Scene2Handle>(null);
+  const scene2LayerRef = useRef<HTMLDivElement>(null);
+  const scene3Ref = useRef<Scene3Handle>(null);
+  const scene3LayerRef = useRef<HTMLDivElement>(null);
+  const matchCutOverlayRef = useRef<HTMLDivElement>(null);
+  const scrollVelocityRef = useRef<number>(0);
+  const lastScrollYRef = useRef<number>(0);
+  const lastScrollTimeRef = useRef<number>(0);
+  const lastWhooshProgressRef = useRef<number>(0);
 
   // Lazily build 3 reusable 128x128 offscreen radial-gradient cloud puff sprites (<0.3ms once)
   const ensureCloudSprites = useCallback(() => {
@@ -266,88 +293,6 @@ export const Scene1Packing: React.FC = () => {
     } catch (_) {}
   }, []);
 
-  // Apply scroll progress directly to DOM nodes without triggering React re-renders
-  const applyScrollMutations = useCallback(
-    (progress: number) => {
-      scrollProgressRef.current = progress;
-
-      // Phase 1: Title Hold (0.00 -> 0.04) & Split Curtain Parting (0.04 -> 0.28)
-      const titlePartProgress = Math.max(0, Math.min(1, (progress - 0.04) / 0.24));
-      const titleOpacity = Math.max(0, 1 - Math.pow(titlePartProgress, 1.35));
-      const splitOffsetPercent = titlePartProgress * 125;
-      const splitDividerOpacity = Math.max(0, 1 - titlePartProgress * 3.2);
-
-      if (titleContainerRef.current) {
-        if (titleOpacity <= 0.002) {
-          titleContainerRef.current.style.display = 'none';
-        } else {
-          titleContainerRef.current.style.display = 'flex';
-          titleContainerRef.current.style.opacity = titleOpacity.toFixed(3);
-        }
-      }
-      if (leftWingRef.current && titleOpacity > 0.002) {
-        leftWingRef.current.style.transform = `translate3d(-${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
-      }
-      if (rightWingRef.current && titleOpacity > 0.002) {
-        rightWingRef.current.style.transform = `translate3d(${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
-      }
-      if (splitDividerRef.current && titleOpacity > 0.002) {
-        splitDividerRef.current.style.opacity = splitDividerOpacity.toFixed(3);
-      }
-      if (scrollPromptRef.current && titleOpacity > 0.002) {
-        scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 3.5).toFixed(3);
-      }
-
-      // Phase 2: Volumetric Cloud Plunge (holds dense during 0.00 -> 0.14 while title is read, then parts 0.14 -> 0.48)
-      const cloudProgress = Math.max(0, Math.min(1, (progress - 0.10) / 0.38));
-      const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.55));
-
-      if (cloudOverlayRef.current) {
-        if (cloudOpacity <= 0.002) {
-          cloudOverlayRef.current.style.display = 'none';
-        } else {
-          cloudOverlayRef.current.style.display = 'block';
-          cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
-          renderCloudCanvas(cloudProgress, cloudOpacity);
-        }
-      }
-
-      // Phase 3: Occlusion Gating — keep warehouse hidden while clouds are 100% opaque (progress < 0.11)
-      if (trackRef.current) {
-        const shouldPauseWarehouse = !isSceneInViewRef.current || progress < 0.11;
-        trackRef.current.classList.toggle('warehouse-paused', shouldPauseWarehouse);
-        trackRef.current.style.visibility = progress < 0.10 ? 'hidden' : 'visible';
-      }
-
-      // Phase 4: Typewriter Dialogue (starts cleanly as clouds finish parting at progress > 0.46 -> 0.84)
-      const dialogueTrigger = Math.max(0, Math.min(1, (progress - 0.46) / 0.38));
-      const typedCharCount = Math.floor(dialogueTrigger * DIALOGUE_FULL.length);
-
-      if (typedCharCount !== lastTypedCharCountRef.current) {
-        lastTypedCharCountRef.current = typedCharCount;
-        if (speechBubbleGroupRef.current) {
-          speechBubbleGroupRef.current.style.display = typedCharCount > 0 ? 'block' : 'none';
-        }
-        if (typedCharCount > 0) {
-          const displayed = DIALOGUE_FULL.slice(0, typedCharCount);
-          const isComplete = typedCharCount >= DIALOGUE_FULL.length;
-          if (speechLine1Ref.current) {
-            speechLine1Ref.current.textContent = `"${displayed.slice(0, 36)}`;
-          }
-          if (speechLine2TextRef.current) {
-            speechLine2TextRef.current.textContent = isComplete
-              ? `${displayed.slice(36)}"`
-              : displayed.slice(36);
-          }
-          if (speechCursorRef.current) {
-            speechCursorRef.current.style.display = isComplete ? 'none' : 'inline';
-          }
-        }
-      }
-    },
-    [renderCloudCanvas]
-  );
-
   // Apply tape sealing mutations directly to SVG attributes without React re-renders
   const applyTapeMutations = useCallback(
     (progress: number) => {
@@ -382,6 +327,186 @@ export const Scene1Packing: React.FC = () => {
     [isPortrait]
   );
 
+  // Apply scroll progress directly to DOM nodes without triggering React re-renders
+  const applyScrollMutations = useCallback(
+    (progress: number) => {
+      scrollProgressRef.current = progress;
+
+      // Unified Movie Timeline Mapping across 1000vh scroll track:
+      // - First 500vh (progress: 0.00 -> 0.50) maps 1:1 to s12Progress (0.00 -> 1.00) for Scene 1 & Scene 2
+      // - Second 500vh (progress: 0.46 -> 1.00) drives the Scene 2 -> Scene 3 Match Cut & Scene 3 timeline
+      const s12Progress = Math.min(1, progress * 2);
+
+      // Phase 1: Title Hold (0.00 -> 0.04) & Split Curtain Parting (0.04 -> 0.28)
+      const titlePartProgress = Math.max(0, Math.min(1, (s12Progress - 0.04) / 0.24));
+      const titleOpacity = Math.max(0, 1 - Math.pow(titlePartProgress, 1.35));
+      const splitOffsetPercent = titlePartProgress * 125;
+      const splitDividerOpacity = Math.max(0, 1 - titlePartProgress * 3.2);
+
+      if (titleContainerRef.current) {
+        if (titleOpacity <= 0.002) {
+          titleContainerRef.current.style.display = 'none';
+        } else {
+          titleContainerRef.current.style.display = 'flex';
+          titleContainerRef.current.style.opacity = titleOpacity.toFixed(3);
+        }
+      }
+      if (leftWingRef.current && titleOpacity > 0.002) {
+        leftWingRef.current.style.transform = `translate3d(-${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+      }
+      if (rightWingRef.current && titleOpacity > 0.002) {
+        rightWingRef.current.style.transform = `translate3d(${splitOffsetPercent.toFixed(2)}%, 0, 0)`;
+      }
+      if (splitDividerRef.current && titleOpacity > 0.002) {
+        splitDividerRef.current.style.opacity = splitDividerOpacity.toFixed(3);
+      }
+      if (scrollPromptRef.current && titleOpacity > 0.002) {
+        scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 3.5).toFixed(3);
+      }
+
+      // Phase 2: Volumetric Cloud Plunge (holds dense during 0.00 -> 0.14 while title is read, then parts 0.14 -> 0.48)
+      const cloudProgress = Math.max(0, Math.min(1, (s12Progress - 0.10) / 0.38));
+      const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.55));
+
+      if (cloudOverlayRef.current) {
+        if (cloudOpacity <= 0.002) {
+          cloudOverlayRef.current.style.display = 'none';
+        } else {
+          cloudOverlayRef.current.style.display = 'block';
+          cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
+          renderCloudCanvas(cloudProgress, cloudOpacity);
+        }
+      }
+
+      // Phase 3: Occlusion Gating — keep warehouse hidden while clouds are 100% opaque (s12Progress < 0.11)
+      if (trackRef.current) {
+        const shouldPauseWarehouse = !isSceneInViewRef.current || s12Progress < 0.11 || s12Progress > 0.54;
+        trackRef.current.classList.toggle('warehouse-paused', shouldPauseWarehouse);
+        trackRef.current.style.visibility = s12Progress < 0.10 ? 'hidden' : 'visible';
+      }
+
+      // Phase 4: Typewriter Dialogue (starts as clouds part at s12Progress > 0.20 -> 0.42)
+      const dialogueTrigger = Math.max(0, Math.min(1, (s12Progress - 0.20) / 0.22));
+      const typedCharCount = Math.floor(dialogueTrigger * DIALOGUE_URDU.length);
+
+      if (typedCharCount !== lastTypedCharCountRef.current) {
+        lastTypedCharCountRef.current = typedCharCount;
+        if (speechBubbleGroupRef.current) {
+          speechBubbleGroupRef.current.style.display = typedCharCount > 0 ? 'block' : 'none';
+        }
+        if (typedCharCount > 0) {
+          const isComplete = typedCharCount >= DIALOGUE_URDU.length;
+          if (speechLine1Ref.current) {
+            speechLine1Ref.current.textContent = isComplete
+              ? `"${DIALOGUE_URDU}"`
+              : `"${DIALOGUE_URDU.slice(0, typedCharCount)}`;
+          }
+          if (speechLine2TextRef.current) {
+            const enCount = Math.floor(dialogueTrigger * DIALOGUE_EN.length);
+            speechLine2TextRef.current.textContent = DIALOGUE_EN.slice(0, enCount);
+          }
+          if (speechCursorRef.current) {
+            speechCursorRef.current.style.display = isComplete ? 'none' : 'inline';
+          }
+        }
+      }
+
+      // Phase 5: Auto-Seal Parcel Stamp before Match Cut
+      if (s12Progress >= 0.42 && !isFullySealed) {
+        sealProgressRef.current = 1;
+        applyTapeMutations(1);
+        soundEngine.playCartonThud();
+        soundEngine.playSuccessChime();
+        setIsFullySealed(true);
+      }
+
+      // Phase 6: Seamless Match Cut Cross-Fade 1 (Scene 1 -> Scene 2: s12Progress 0.45 -> 0.54)
+      const s1Opacity = s12Progress < 0.45 ? 1 : Math.max(0, 1 - (s12Progress - 0.45) / 0.08);
+      const s2EnterOpacity = s12Progress < 0.45 ? 0 : Math.min(1, (s12Progress - 0.45) / 0.08);
+
+      // Phase 7: Seamless Match Cut Cross-Fade 2 (Scene 2 -> Scene 3: progress 0.46 -> 0.52)
+      const s2ExitOpacity = progress < 0.46 ? 1 : Math.max(0, 1 - (progress - 0.46) / 0.055);
+      const s2Opacity = Math.min(s2EnterOpacity, s2ExitOpacity);
+      const s3Opacity = progress < 0.46 ? 0 : Math.min(1, (progress - 0.46) / 0.055);
+
+      // Warehouse SVG Visibility & Opacity
+      if (trackRef.current) {
+        if (s12Progress > 0.54) {
+          trackRef.current.style.visibility = 'hidden';
+          trackRef.current.style.opacity = '0';
+        } else {
+          trackRef.current.style.visibility = s12Progress < 0.08 ? 'hidden' : 'visible';
+          trackRef.current.style.opacity = s1Opacity.toFixed(3);
+        }
+      }
+
+      // Scene 2 City Rush Visibility & Opacity (Pure opacity cross-fade — zero CSS scale bitmap stretching)
+      if (scene2LayerRef.current) {
+        if (s12Progress < 0.44 || progress > 0.525) {
+          scene2LayerRef.current.style.visibility = 'hidden';
+          scene2LayerRef.current.style.opacity = '0';
+          scene2Ref.current?.setActive(false);
+        } else {
+          scene2LayerRef.current.style.visibility = 'visible';
+          scene2LayerRef.current.style.opacity = s2Opacity.toFixed(3);
+          scene2Ref.current?.setActive(true);
+        }
+      }
+
+      // Scene 3 Doorstep Intercept Visibility & Opacity (Inside Same Unified Sticky Stage)
+      if (scene3LayerRef.current) {
+        if (progress < 0.455) {
+          scene3LayerRef.current.style.visibility = 'hidden';
+          scene3LayerRef.current.style.opacity = '0';
+          scene3LayerRef.current.style.pointerEvents = 'none';
+          scene3Ref.current?.setActive(false);
+        } else {
+          scene3LayerRef.current.style.visibility = 'visible';
+          scene3LayerRef.current.style.opacity = s3Opacity.toFixed(3);
+          scene3LayerRef.current.style.pointerEvents = progress > 0.50 ? 'auto' : 'none';
+          scene3Ref.current?.setActive(true);
+        }
+      }
+
+      // Match Cut Speed Streaks Overlay (Flares at Scene 1->2 AND Scene 2->3 transitions)
+      if (matchCutOverlayRef.current) {
+        const distFromCut1 = Math.abs(s12Progress - 0.495);
+        const matchProgress1 = Math.max(0, 1 - distFromCut1 / 0.045);
+        const distFromCut2 = Math.abs(progress - 0.49);
+        const matchProgress2 = Math.max(0, 1 - distFromCut2 / 0.032);
+        const matchProgress = Math.max(matchProgress1, matchProgress2);
+
+        if (matchProgress <= 0.005) {
+          matchCutOverlayRef.current.style.display = 'none';
+        } else {
+          matchCutOverlayRef.current.style.display = 'block';
+          matchCutOverlayRef.current.style.opacity = matchProgress.toFixed(3);
+        }
+      }
+
+      // Camera Whoosh Sound right at Match Cut 1 or Match Cut 2
+      const isAtCut1 = s12Progress >= 0.48 && s12Progress <= 0.52;
+      const isAtCut2 = progress >= 0.48 && progress <= 0.505;
+      if ((isAtCut1 || isAtCut2) && Math.abs(progress - lastWhooshProgressRef.current) > 0.04) {
+        lastWhooshProgressRef.current = progress;
+        soundEngine.playWhoosh();
+      }
+
+      // Drive Scene 2 City Rush timeline
+      if (scene2Ref.current && s12Progress >= 0.44 && progress <= 0.53) {
+        const p2 = Math.max(0, Math.min(1, (s12Progress - 0.47) / 0.53));
+        scene2Ref.current.setProgress(p2, scrollVelocityRef.current);
+      }
+
+      // Drive Scene 3 Doorstep Intercept timeline
+      if (scene3Ref.current && progress >= 0.455) {
+        const p3 = Math.max(0, Math.min(1, (progress - 0.46) / 0.54));
+        scene3Ref.current.setProgress(p3);
+      }
+    },
+    [renderCloudCanvas, applyTapeMutations, isFullySealed]
+  );
+
   // Mount Warehouse SVG when nearing Scene 1 & pause animations when offscreen
   useEffect(() => {
     const el = containerRef.current;
@@ -409,7 +534,8 @@ export const Scene1Packing: React.FC = () => {
         if (!entry) return;
         isSceneInViewRef.current = entry.isIntersecting;
         if (trackRef.current) {
-          const shouldPause = !entry.isIntersecting || scrollProgressRef.current < 0.11;
+          const s12 = Math.min(1, scrollProgressRef.current * 2);
+          const shouldPause = !entry.isIntersecting || s12 < 0.11 || s12 > 0.54;
           trackRef.current.classList.toggle('warehouse-paused', shouldPause);
         }
       },
@@ -458,22 +584,38 @@ export const Scene1Packing: React.FC = () => {
     }
   }, [isWarehouseMounted, isPortrait, applyScrollMutations, applyTapeMutations, updateCachedCTM]);
 
+  // Expose imperative handle for zero React re-render scrollytelling
+  React.useImperativeHandle(ref, () => ({
+    setProgress: (p: number) => {
+      targetScrollProgressRef.current = p;
+      applyScrollMutations(p);
+      if (p >= 0.425 && !isFullySealed) {
+        sealProgressRef.current = 1;
+        applyTapeMutations(1);
+        soundEngine.playCartonThud();
+        soundEngine.playSuccessChime();
+        setIsFullySealed(true);
+      }
+    },
+  }), [applyScrollMutations, applyTapeMutations, isFullySealed]);
+
   // ============================================================================
   // REFRESH-RATE-INDEPENDENT (60Hz / 90Hz / 120Hz / 144Hz / 240Hz) SCROLL ENGINE
   // - Uses true delta-time (dt in seconds) via performance.now() — NEVER fixed to 60fps
-  // - Caps maximum animation velocity (MAX_PROGRESS_SPEED = 0.34 / sec) and tethers
+  // - Caps maximum animation velocity (MAX_PROGRESS_SPEED = 0.17 / sec across 1000vh) and tethers
   //   runaway mobile touch flings so fast swipes never skip Title / Cloud / Dialogue phases
   // ============================================================================
   useEffect(() => {
+    if (embedded) return;
     let rafId = 0;
     let lastFrameTime = 0;
 
-    // Maximum narrative progress speed per second (0 -> 1 takes at least ~2.95s even on violent fling)
-    const MAX_PROGRESS_SPEED = 0.34;
+    // Maximum narrative progress speed per second (scaled for unified 1000vh Scene 1+2+3 timeline)
+    const MAX_PROGRESS_SPEED = 0.17;
     // Exponential damping stiffness (higher = more responsive to slow scroll, capped by MAX_PROGRESS_SPEED on fast scroll)
     const DAMPING_LAMBDA = 9.5;
     // Maximum lead distance native scroll can get ahead of rendered animation during a fast fling
-    const MAX_FLING_LEAD = 0.16;
+    const MAX_FLING_LEAD = 0.08;
 
     const animateScrollLoop = (now: number) => {
       const dt =
@@ -503,6 +645,8 @@ export const Scene1Packing: React.FC = () => {
         Math.abs(dampedStep) > maxStep ? Math.sign(dampedStep) * maxStep : dampedStep;
 
       const nextProgress = Math.max(0, Math.min(1, current + step));
+      // Natural velocity decay as scroll momentum settles
+      scrollVelocityRef.current *= Math.exp(-4.2 * dt);
       applyScrollMutations(nextProgress);
 
       rafId = requestAnimationFrame(animateScrollLoop);
@@ -521,6 +665,15 @@ export const Scene1Packing: React.FC = () => {
       const windowHeight = window.innerHeight;
       const totalScrollable = rect.height - windowHeight;
       if (totalScrollable <= 0) return;
+
+      const now = performance.now();
+      const currentScrollY = window.scrollY;
+      const dtScroll = Math.max(0.005, (now - lastScrollTimeRef.current) / 1000);
+      const dy = currentScrollY - lastScrollYRef.current;
+      // Directional velocity: positive on scroll down, negative on scroll up
+      scrollVelocityRef.current = dy / dtScroll;
+      lastScrollYRef.current = currentScrollY;
+      lastScrollTimeRef.current = now;
 
       const currentScroll = -rect.top;
       let rawTarget = Math.max(0, Math.min(1, currentScroll / totalScrollable));
@@ -731,21 +884,44 @@ export const Scene1Packing: React.FC = () => {
     window.addEventListener('pointerup', onUp, { passive: true });
   };
 
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-[460vh] bg-[#0b0b0b]"
-      id="movie-scene-1"
-      data-story-scene="true"
-    >
-      {/* Sticky Full-Screen Viewport - 100vw x 100vh Edge-to-Edge */}
-      <div className="sticky top-0 left-0 w-full h-screen h-dvh overflow-hidden flex items-center justify-center bg-[#07090e]">
-        <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-[#07090e]">
+  const stageContent = (
+    <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-[#07090e]">
+      {/* Scene 2 City Rush Stage (Fades in at match cut 1, fades out at match cut 2) */}
+      <div
+        ref={scene2LayerRef}
+        className="absolute inset-0 w-full h-full select-none z-10"
+        style={{ visibility: 'hidden', opacity: 0 }}
+      >
+        <Scene2CityRush ref={scene2Ref} isPortrait={isPortrait} isActive={false} />
+      </div>
+
+      {/* Scene 3 Doorstep Intercept Stage (Fades in at match cut 2 inside unified sticky stage) */}
+      <div
+        ref={scene3LayerRef}
+        className="absolute inset-0 w-full h-full select-none z-15"
+        style={{ visibility: 'hidden', opacity: 0, pointerEvents: 'none' }}
+      >
+        <Scene3Doorstep ref={scene3Ref} embedded={true} isPortrait={isPortrait} isActive={false} />
+      </div>
+
+      {/* Match Cut Speed Streaks Overlay (Flares at Scene 1->2 and Scene 2->3 transitions) */}
+      <div
+        ref={matchCutOverlayRef}
+        className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center overflow-hidden"
+        style={{ display: 'none', opacity: 0 }}
+      >
+        <div className="absolute inset-0 bg-radial from-amber-500/20 via-transparent to-black/60" />
+        <svg className="w-full h-full" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+          <line x1="0" y1="720" x2="1920" y2="720" stroke="#fef08a" strokeWidth="3" strokeDasharray="180 80 240 60" opacity="0.8" />
+          <line x1="0" y1="785" x2="1920" y2="785" stroke="#f59e0b" strokeWidth="4" strokeDasharray="300 120 400 90" opacity="0.9" />
+          <line x1="0" y1="840" x2="1920" y2="840" stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="200 100 250 80" opacity="0.75" />
+        </svg>
+      </div>
           {isWarehouseMounted && (
           <svg
             ref={trackRef}
             viewBox={isPortrait ? '0 0 1080 1520' : '0 0 1920 1080'}
-            className="w-full h-full object-cover select-none warehouse-paused"
+            className="absolute inset-0 w-full h-full object-cover select-none warehouse-paused z-0"
             preserveAspectRatio="xMidYMid slice"
             style={{ visibility: 'hidden' }}
           >
@@ -817,13 +993,15 @@ export const Scene1Packing: React.FC = () => {
                   animation: characterEyeBlink 4.2s ease-in-out infinite;
                 }
 
-                /* Continuous Delicate Karak Tea Steam (Continuous Ribbon Flow) */
+                /* Continuous Delicate Karak Tea Steam (Continuous Ribbon Flow with Natural Rise & Dissipation) */
                 .tea-smoke-container {
                   position: relative;
                   width: 100%;
                   height: 100%;
                   pointer-events: none;
                   filter: url('#tea-smoke-filter') blur(4px);
+                  -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 12%, rgba(0, 0, 0, 0.6) 42%, rgba(0, 0, 0, 0.15) 75%, rgba(0, 0, 0, 0) 100%);
+                  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 12%, rgba(0, 0, 0, 0.6) 42%, rgba(0, 0, 0, 0.15) 75%, rgba(0, 0, 0, 0) 100%);
                   transform: translateZ(0);
                 }
 
@@ -836,7 +1014,7 @@ export const Scene1Packing: React.FC = () => {
                   background: radial-gradient(circle, rgba(255, 250, 240, 0.45) 0%, rgba(254, 243, 199, 0.25) 45%, rgba(255, 255, 255, 0.08) 75%, transparent 100%);
                   border-radius: 50%;
                   transform: translateX(-50%) scale(0.7);
-                  animation: teaSteamContinuous 6.5s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+                  animation: teaSteamContinuous 6.5s cubic-bezier(0.25, 0.65, 0.4, 1) infinite;
                   will-change: transform, opacity;
                 }
 
@@ -854,28 +1032,32 @@ export const Scene1Packing: React.FC = () => {
                 .tea-smoke-container span:nth-child(11) { animation-delay: 5.40s; left: 50%; }
                 .tea-smoke-container span:nth-child(12) { animation-delay: 5.94s; left: 48%; width: 12px; height: 12px; }
 
-                /* Continuous, Slender, Ethereal Slow-Rising Vapor */
+                /* Continuous, Slender, Ethereal Slow-Rising Vapor that Fades Out As It Rises */
                 @keyframes teaSteamContinuous {
                   0% {
                     bottom: 0%;
-                    transform: translateX(-50%) scale(0.7);
+                    transform: translateX(-50%) scale(0.65);
                     opacity: 0;
                   }
-                  15% {
-                    opacity: 0.32;
-                    transform: translateX(-50%) scale(0.95);
+                  12% {
+                    opacity: 0.42;
+                    transform: translateX(-50%) scale(0.85);
                   }
-                  42% {
-                    transform: translateX(calc(-50% - 3px)) scale(1.3);
-                    opacity: 0.22;
+                  30% {
+                    opacity: 0.28;
+                    transform: translateX(calc(-50% - 3px)) scale(1.15);
                   }
-                  72% {
-                    transform: translateX(calc(-50% + 4px)) scale(1.65);
-                    opacity: 0.12;
+                  55% {
+                    opacity: 0.14;
+                    transform: translateX(calc(-50% + 4px)) scale(1.5);
+                  }
+                  75% {
+                    opacity: 0.05;
+                    transform: translateX(calc(-50% - 2px)) scale(1.85);
                   }
                   100% {
                     bottom: 100%;
-                    transform: translateX(calc(-50% - 2px)) scale(2.05);
+                    transform: translateX(calc(-50% + 3px)) scale(2.2);
                     opacity: 0;
                   }
                 }
@@ -1117,7 +1299,7 @@ export const Scene1Packing: React.FC = () => {
                 {/* Overhead Digital Warehouse Clock */}
                 <g transform="translate(540, 36)">
                   <rect x="-80" y="-12" width="160" height="24" rx="4" fill="#09090b" stroke="#374151" strokeWidth="1.5" />
-                  <text x="-65" y="5" fill="#ef4444" fontSize="12" fontFamily="monospace" fontWeight="bold" letterSpacing="1.5">
+                  <text x="-65" y="5" fill="#ef4444" fontSize="12" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1.5">
                     07:42<tspan className="animate-blink-dot">:</tspan>18
                   </text>
                   <rect x="15" y="-6" width="50" height="13" rx="2" fill="#1e293b" />
@@ -1153,7 +1335,7 @@ export const Scene1Packing: React.FC = () => {
                     <rect width="70" height="68" fill="url(#kraftGrain)" rx="2" />
                     <rect x="0" y="30" width="70" height="10" fill="#15803d" opacity="0.9" />
                     <rect x="6" y="8" width="46" height="16" fill="#ffffff" rx="1" />
-                    <text x="9" y="19" fill="#0f172a" fontSize="6" fontFamily="monospace" fontWeight="bold">
+                    <text x="9" y="19" fill="#0f172a" fontSize="6" fontFamily="sans-serif" fontWeight="bold">
                       KARACHI
                     </text>
                   </g>
@@ -1465,30 +1647,30 @@ export const Scene1Packing: React.FC = () => {
                     <text x="-38" y="-46" fill="#0f172a" fontSize="5.0" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.2">
                       DAILY DISPATCH REGISTER
                     </text>
-                    <text x="-38" y="-39" fill="#64748b" fontSize="3.8" fontFamily="monospace">
+                    <text x="-38" y="-39" fill="#64748b" fontSize="3.8" fontFamily="sans-serif">
                       BATCH #PK-409 • 07:30 PKT
                     </text>
                     <line x1="-38" y1="-35" x2="38" y2="-35" stroke="#cbd5e1" strokeWidth="0.8" />
 
                     {/* Lined Ledger Rows Constrained Within Margins */}
-                    <text x="-36" y="-24" fill="#059669" fontSize="4.4" fontFamily="monospace" fontWeight="bold">
+                    <text x="-36" y="-24" fill="#059669" fontSize="4.4" fontFamily="sans-serif" fontWeight="bold">
                       [✓] ORD-8841 ISB
                     </text>
                     <rect x="-38" y="-18" width="76" height="14" fill="#fef08a" stroke="#ca8a04" strokeWidth="0.5" rx="1" />
-                    <text x="-36" y="-10" fill="#991b1b" fontSize="4.4" fontFamily="monospace" fontWeight="900">
+                    <text x="-36" y="-10" fill="#991b1b" fontSize="4.4" fontFamily="sans-serif" fontWeight="900">
                       [➔] ORD-8842 LHR
                     </text>
-                    <text x="-26" y="-4" fill="#b91c1c" fontSize="3.8" fontFamily="monospace" fontWeight="bold">
+                    <text x="-26" y="-4" fill="#b91c1c" fontSize="3.8" fontFamily="sans-serif" fontWeight="bold">
                       COD RS. 4,500
                     </text>
 
                     <line x1="-38" y1="2" x2="38" y2="2" stroke="#e2e8f0" strokeWidth="0.5" />
-                    <text x="-36" y="11" fill="#64748b" fontSize="4.4" fontFamily="monospace">
+                    <text x="-36" y="11" fill="#64748b" fontSize="4.4" fontFamily="sans-serif">
                       [ ] ORD-8843 KHI
                     </text>
 
                     <line x1="-38" y1="17" x2="38" y2="17" stroke="#e2e8f0" strokeWidth="0.5" />
-                    <text x="-36" y="26" fill="#94a3b8" fontSize="4.4" fontFamily="monospace">
+                    <text x="-36" y="26" fill="#94a3b8" fontSize="4.4" fontFamily="sans-serif">
                       [ ] ORD-8844 MUX
                     </text>
                   </g>
@@ -1559,7 +1741,7 @@ export const Scene1Packing: React.FC = () => {
                   {/* Digital Weight Readout on Scale Front Apron */}
                   <g transform="translate(450, 1079)">
                     <rect width="160" height="18" rx="2.5" fill="#09090b" stroke="#1e293b" strokeWidth="1" />
-                    <text x="12" y="13.5" fill="#22c55e" fontSize="12" fontFamily="monospace" fontWeight="bold" letterSpacing="1.5">
+                    <text x="12" y="13.5" fill="#22c55e" fontSize="12" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1.5">
                       1.450 KG
                     </text>
                     <circle cx="118" cy="9" r="2.2" fill="#22c55e" />
@@ -1602,19 +1784,19 @@ export const Scene1Packing: React.FC = () => {
                 <g transform="translate(545, 1010)">
                   <circle cx="0" cy="0" r="16" fill="none" stroke="#3b1f0b" strokeWidth="1.2" strokeDasharray="12 2 15 2" opacity="0.55" />
                   <circle cx="0" cy="0" r="13" fill="none" stroke="#3b1f0b" strokeWidth="0.7" opacity="0.5" />
-                  <text x="0" y="-7" fill="#3b1f0b" fontSize="3.4" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.6">
+                  <text x="0" y="-7" fill="#3b1f0b" fontSize="3.4" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.6">
                     BOX CERTIFICATE
                   </text>
                   <text x="0" y="-2" fill="#3b1f0b" fontSize="2.8" fontFamily="sans-serif" textAnchor="middle" opacity="0.55">
                     SINGLEWALL
                   </text>
-                  <text x="0" y="3" fill="#3b1f0b" fontSize="3.2" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.6">
+                  <text x="0" y="3" fill="#3b1f0b" fontSize="3.2" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.6">
                     BURST 200 LBS
                   </text>
                   <text x="0" y="8" fill="#3b1f0b" fontSize="2.8" fontFamily="sans-serif" textAnchor="middle" opacity="0.55">
                     GROSS 65 LBS
                   </text>
-                  <text x="0" y="12" fill="#3b1f0b" fontSize="2.6" fontFamily="monospace" textAnchor="middle" opacity="0.5">
+                  <text x="0" y="12" fill="#3b1f0b" fontSize="2.6" fontFamily="sans-serif" textAnchor="middle" opacity="0.5">
                     LAHORE PK
                   </text>
                 </g>
@@ -1639,13 +1821,13 @@ export const Scene1Packing: React.FC = () => {
                   </g>
 
                   {/* Max Weight */}
-                  <text x="24" y="74" fill="#251205" fontSize="5.8" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.8">
+                  <text x="24" y="74" fill="#251205" fontSize="5.8" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.8">
                     MAX: 35 KG
                   </text>
                   <text x="24" y="90" fill="#251205" fontSize="6.8" fontFamily="sans-serif" textAnchor="middle" opacity="0.75">
                     ♲ RECYCLED
                   </text>
-                  <text x="24" y="102" fill="#251205" fontSize="4.8" fontFamily="monospace" textAnchor="middle" opacity="0.65">
+                  <text x="24" y="102" fill="#251205" fontSize="4.8" fontFamily="sans-serif" textAnchor="middle" opacity="0.65">
                     LOT #PK-409
                   </text>
                 </g>
@@ -1673,7 +1855,7 @@ export const Scene1Packing: React.FC = () => {
                     <g ref={slidePromptGroupRef} transform="translate(570, 845)" className="pointer-events-none">
                       <rect x="-103" y="-11" width="210" height="22" rx="11" fill="#000000" fillOpacity="0.45" />
                       <rect x="-105" y="-14" width="210" height="22" rx="11" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" />
-                      <text x="0" y="1" fill="#fef08a" fontSize="9.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
+                      <text x="0" y="1" fill="#fef08a" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
                         SLIDE TAPE TO SEAL BOX ➔
                       </text>
                     </g>
@@ -1701,7 +1883,7 @@ export const Scene1Packing: React.FC = () => {
                   <rect x="2" y="3" width="180" height="110" rx="3.5" fill="#000000" fillOpacity="0.3" />
                   <rect width="180" height="110" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" />
                   <rect x="0" y="0" width="180" height="22" fill="#0f172a" rx="2.5" />
-                  <text x="10" y="15" fill="#f59e0b" fontSize="9.5" fontFamily="monospace" fontWeight="bold">
+                  <text x="10" y="15" fill="#f59e0b" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold">
                     LEOPARDS COD EXPRESS
                   </text>
                   <g transform="translate(10, 28)">
@@ -1715,17 +1897,17 @@ export const Scene1Packing: React.FC = () => {
                     <line x1="41" y1="0" x2="41" y2="22" stroke="#000" strokeWidth="3.2" />
                     <line x1="48" y1="0" x2="48" y2="22" stroke="#000" strokeWidth="1.5" />
                   </g>
-                  <text x="76" y="38" fill="#0f172a" fontSize="9.2" fontFamily="monospace" fontWeight="bold">
+                  <text x="76" y="38" fill="#0f172a" fontSize="9.2" fontFamily="sans-serif" fontWeight="bold">
                     DEST: LAHORE, PK
                   </text>
-                  <text x="76" y="50" fill="#475569" fontSize="7.8" fontFamily="monospace">
+                  <text x="76" y="50" fill="#475569" fontSize="7.8" fontFamily="sans-serif">
                     TRACK: #PK-8842
                   </text>
                   <rect x="8" y="60" width="164" height="40" rx="2.5" fill="#fef2f2" stroke="#ef4444" strokeWidth="0.8" />
                   <text x="12" y="74" fill="#991b1b" fontSize="7.8" fontFamily="sans-serif" fontWeight="bold">
                     CASH ON DELIVERY (COD):
                   </text>
-                  <text x="12" y="92" fill="#b91c1c" fontSize="13.5" fontFamily="monospace" fontWeight="bold">
+                  <text x="12" y="92" fill="#b91c1c" fontSize="13.5" fontFamily="sans-serif" fontWeight="bold">
                     RS. 4,500 /-
                   </text>
                 </g>
@@ -1749,7 +1931,7 @@ export const Scene1Packing: React.FC = () => {
                       <circle cx="0" cy="0" r="34" fill="#09090b" fillOpacity="0.04" stroke="#09090b" strokeWidth="1.4" opacity="0.88" />
                       <circle cx="0" cy="0" r="28" fill="none" stroke="#09090b" strokeWidth="1" strokeDasharray="3,3" opacity="0.75" />
                       <g transform="translate(0, -19)">
-                        <text x="0" y="0" fill="#09090b" fontSize="6.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.5" opacity="0.85">
+                        <text x="0" y="0" fill="#09090b" fontSize="6.5" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" letterSpacing="1.5" opacity="0.85">
                           ★ ★ ★
                         </text>
                       </g>
@@ -1778,20 +1960,27 @@ export const Scene1Packing: React.FC = () => {
                   style={{ touchAction: 'none' }}
                 />
 
-                {/* Typewriter Speech Bubble Above Tariq */}
-                <g ref={speechBubbleGroupRef} transform="translate(320, 390)" style={{ display: 'none' }}>
-                  <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                  <rect x="0" y="6" width="440" height="88" rx="16" fill="#000000" fillOpacity="0.5" />
-                  <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                  <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
-                  <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
-                    TARIQ (PACKER)
-                  </text>
-                  <text ref={speechLine1Ref} x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600" />
-                  <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                    <tspan ref={speechLine2TextRef} />
-                    <tspan ref={speechCursorRef} fill="#f59e0b" className="animate-pulse">|</tspan>
-                  </text>
+                {/* Typewriter Speech Bubble Above Tariq (Mobile) */}
+                <g ref={speechBubbleGroupRef} transform="translate(270, 385)" style={{ display: 'none' }}>
+                  <polygon points="220,96 242,128 234,96" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.6" />
+                  <line x1="221" y1="96" x2="233" y2="96" stroke="#0b0f17" strokeWidth="2.5" />
+                  <foreignObject x="0" y="0" width="540" height="116" className="overflow-visible pointer-events-none">
+                    <div
+                      className="relative w-full min-h-[96px] rounded-2xl bg-[#0b0f17]/96 border-[1.6px] border-[#c9a47a] px-5 py-3.5 shadow-[0_12px_28px_rgba(0,0,0,0.85)] flex flex-col justify-center box-border select-none"
+                    >
+                      <div className="absolute -top-3 left-6 bg-[#c9a47a] px-2.5 py-0.5 rounded text-[10px] font-black text-black tracking-wider uppercase shadow-sm">
+                        TARIQ (PACKER)
+                      </div>
+                      <p
+                        ref={speechLine1Ref}
+                        className="font-sans text-[13.5px] font-semibold text-white leading-snug break-words m-0 tracking-wide"
+                      />
+                      <p className="font-sans text-[12px] font-medium text-[#cbd5e1] italic leading-snug mt-1 break-words m-0">
+                        <span ref={speechLine2TextRef} />
+                        <span ref={speechCursorRef} className="text-amber-500 font-bold not-italic ml-0.5 animate-pulse">|</span>
+                      </p>
+                    </div>
+                  </foreignObject>
                 </g>
               </g>
             ) : (
@@ -1835,7 +2024,7 @@ export const Scene1Packing: React.FC = () => {
                 {/* LIVE DIGITAL WAREHOUSE CLOCK ON THE CENTRAL ROOF GIRDER */}
                 <g transform="translate(960, 36)">
                   <rect x="-85" y="-12" width="170" height="26" rx="4" fill="#09090b" stroke="#374151" strokeWidth="1.5" />
-                  <text x="-70" y="6" fill="#ef4444" fontSize="13" fontFamily="monospace" fontWeight="bold" letterSpacing="1.5">
+                  <text x="-70" y="6" fill="#ef4444" fontSize="13" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1.5">
                     07:42<tspan className="animate-blink-dot">:</tspan>18
                   </text>
                   <rect x="15" y="-6" width="55" height="15" rx="2" fill="#1e293b" />
@@ -1925,7 +2114,7 @@ export const Scene1Packing: React.FC = () => {
                     <rect width="145" height="100" fill="url(#kraftGrain)" rx="3" />
                     <rect x="0" y="45" width="145" height="14" fill="#15803d" opacity="0.9" />
                     <rect x="15" y="15" width="90" height="24" fill="#f8fafc" rx="2" />
-                    <text x="20" y="31" fill="#0f172a" fontSize="9" fontFamily="monospace" fontWeight="bold">
+                    <text x="20" y="31" fill="#0f172a" fontSize="9" fontFamily="sans-serif" fontWeight="bold">
                       KARACHI (COD)
                     </text>
 
@@ -1933,7 +2122,7 @@ export const Scene1Packing: React.FC = () => {
                     <rect x="155" y="15" width="180" height="85" fill="url(#kraftGrain)" rx="3" />
                     <rect x="155" y="55" width="180" height="12" fill="#ea580c" opacity="0.9" />
                     <rect x="175" y="25" width="85" height="24" fill="#fef3c7" rx="2" />
-                    <text x="180" y="41" fill="#78350f" fontSize="9" fontFamily="monospace" fontWeight="bold">
+                    <text x="180" y="41" fill="#78350f" fontSize="9" fontFamily="sans-serif" fontWeight="bold">
                       MULTAN HUB
                     </text>
 
@@ -1946,14 +2135,14 @@ export const Scene1Packing: React.FC = () => {
                     <rect width="165" height="100" fill="url(#kraftGrain)" rx="3" />
                     <rect x="0" y="50" width="165" height="12" fill="#0284c7" opacity="0.9" />
                     <rect x="20" y="20" width="95" height="24" fill="#ffffff" rx="2" />
-                    <text x="25" y="36" fill="#0f172a" fontSize="9" fontFamily="monospace" fontWeight="bold">
+                    <text x="25" y="36" fill="#0f172a" fontSize="9" fontFamily="sans-serif" fontWeight="bold">
                       PESHAWAR EXP
                     </text>
 
                     <rect x="175" y="10" width="155" height="90" fill="#78350f" rx="3" />
                     <rect x="175" y="10" width="155" height="90" fill="url(#kraftGrain)" rx="3" />
                     <rect x="195" y="25" width="95" height="24" fill="#fee2e2" rx="2" />
-                    <text x="200" y="41" fill="#991b1b" fontSize="9" fontFamily="monospace" fontWeight="bold">
+                    <text x="200" y="41" fill="#991b1b" fontSize="9" fontFamily="sans-serif" fontWeight="bold">
                       ISLAMABAD COD
                     </text>
 
@@ -1969,7 +2158,7 @@ export const Scene1Packing: React.FC = () => {
                     </text>
                     <rect x="190" y="15" width="170" height="85" fill="#6a4c2e" rx="3" />
                     <rect x="190" y="15" width="170" height="85" fill="url(#kraftGrain)" rx="3" />
-                    <text x="210" y="60" fill="#10b981" fontSize="11" fontFamily="monospace" fontWeight="bold">
+                    <text x="210" y="60" fill="#10b981" fontSize="11" fontFamily="sans-serif" fontWeight="bold">
                       SUKKUR #290
                     </text>
                   </g>
@@ -2337,38 +2526,38 @@ export const Scene1Packing: React.FC = () => {
                     <text x="-46" y="-56" fill="#0f172a" fontSize="6.2" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.2">
                       DAILY DISPATCH REGISTER
                     </text>
-                    <text x="-46" y="-48" fill="#64748b" fontSize="4.6" fontFamily="monospace">
+                    <text x="-46" y="-48" fill="#64748b" fontSize="4.6" fontFamily="sans-serif">
                       BATCH #PK-409 • 07:30 PKT
                     </text>
                     <line x1="-46" y1="-44" x2="46" y2="-44" stroke="#cbd5e1" strokeWidth="0.8" />
 
                     {/* Logged Rows Facing Worker (Cleanly Within Margins) */}
-                    <text x="-44" y="-32" fill="#059669" fontSize="5.0" fontFamily="monospace" fontWeight="bold">
+                    <text x="-44" y="-32" fill="#059669" fontSize="5.0" fontFamily="sans-serif" fontWeight="bold">
                       [✓] ORD-8841 ISB 3.2k
                     </text>
                     <line x1="-46" y1="-26" x2="46" y2="-26" stroke="#f1f5f9" strokeWidth="0.6" />
 
                     {/* Active Order Highlight Row */}
                     <rect x="-46" y="-22" width="92" height="18" fill="#fef08a" stroke="#ca8a04" strokeWidth="0.6" rx="1.5" />
-                    <text x="-44" y="-12" fill="#991b1b" fontSize="5.0" fontFamily="monospace" fontWeight="900">
+                    <text x="-44" y="-12" fill="#991b1b" fontSize="5.0" fontFamily="sans-serif" fontWeight="900">
                       [➔] ORD-8842 LHR COD
                     </text>
-                    <text x="-32" y="-5" fill="#b91c1c" fontSize="4.4" fontFamily="monospace" fontWeight="bold">
+                    <text x="-32" y="-5" fill="#b91c1c" fontSize="4.4" fontFamily="sans-serif" fontWeight="bold">
                       RS. 4,500 (URGENT)
                     </text>
 
                     <line x1="-46" y1="0" x2="46" y2="0" stroke="#f1f5f9" strokeWidth="0.6" />
-                    <text x="-44" y="11" fill="#64748b" fontSize="5.0" fontFamily="monospace">
+                    <text x="-44" y="11" fill="#64748b" fontSize="5.0" fontFamily="sans-serif">
                       [ ] ORD-8843 KHI 2.1k
                     </text>
 
                     <line x1="-46" y1="18" x2="46" y2="18" stroke="#f1f5f9" strokeWidth="0.6" />
-                    <text x="-44" y="29" fill="#94a3b8" fontSize="5.0" fontFamily="monospace">
+                    <text x="-44" y="29" fill="#94a3b8" fontSize="5.0" fontFamily="sans-serif">
                       [ ] ORD-8844 MUX 1.8k
                     </text>
 
                     {/* Tariq's Signature Line */}
-                    <text x="-44" y="44" fill="#94a3b8" fontSize="4.0" fontFamily="monospace">
+                    <text x="-44" y="44" fill="#94a3b8" fontSize="4.0" fontFamily="sans-serif">
                       VERIFIED BY PACKER:
                     </text>
                     <path d="M-42 52 Q -30 45 -22 51 Q -15 56 -5 49 Q 5 44 15 50" fill="none" stroke="#0284c7" strokeWidth="1" opacity="0.8" />
@@ -2467,7 +2656,7 @@ export const Scene1Packing: React.FC = () => {
                   {/* Digital Weight Readout on Scale Front Apron */}
                   <g transform="translate(865, 911)">
                     <rect width="180" height="20" rx="3" fill="#09090b" stroke="#334155" strokeWidth="1.2" />
-                    <text x="12" y="14.8" fill="#22c55e" fontSize="12.5" fontFamily="monospace" fontWeight="bold" letterSpacing="1.5">
+                    <text x="12" y="14.8" fill="#22c55e" fontSize="12.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1.5">
                       1.450 KG
                     </text>
                     <circle cx="128" cy="10" r="2.3" fill="#22c55e" />
@@ -2510,19 +2699,19 @@ export const Scene1Packing: React.FC = () => {
                 <g transform="translate(965, 835)">
                   <circle cx="0" cy="0" r="18" fill="none" stroke="#3b1f0b" strokeWidth="1.4" strokeDasharray="14 2 18 2" opacity="0.55" />
                   <circle cx="0" cy="0" r="14" fill="none" stroke="#3b1f0b" strokeWidth="0.8" opacity="0.5" />
-                  <text x="0" y="-8" fill="#3b1f0b" fontSize="3.8" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.6">
+                  <text x="0" y="-8" fill="#3b1f0b" fontSize="3.8" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.6">
                     BOX CERTIFICATE
                   </text>
                   <text x="0" y="-3" fill="#3b1f0b" fontSize="3.2" fontFamily="sans-serif" textAnchor="middle" opacity="0.55">
                     SINGLEWALL
                   </text>
-                  <text x="0" y="3" fill="#3b1f0b" fontSize="3.6" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.6">
+                  <text x="0" y="3" fill="#3b1f0b" fontSize="3.6" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.6">
                     BURST 200 LBS
                   </text>
                   <text x="0" y="8" fill="#3b1f0b" fontSize="3.2" fontFamily="sans-serif" textAnchor="middle" opacity="0.55">
                     GROSS 65 LBS
                   </text>
-                  <text x="0" y="13" fill="#3b1f0b" fontSize="3.0" fontFamily="monospace" textAnchor="middle" opacity="0.5">
+                  <text x="0" y="13" fill="#3b1f0b" fontSize="3.0" fontFamily="sans-serif" textAnchor="middle" opacity="0.5">
                     LAHORE PK
                   </text>
                 </g>
@@ -2547,13 +2736,13 @@ export const Scene1Packing: React.FC = () => {
                   </g>
 
                   {/* Max Weight Stamp */}
-                  <text x="28" y="80" fill="#251205" fontSize="6.4" fontFamily="monospace" fontWeight="bold" textAnchor="middle" opacity="0.8">
+                  <text x="28" y="80" fill="#251205" fontSize="6.4" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" opacity="0.8">
                     MAX: 35 KG
                   </text>
                   <text x="28" y="96" fill="#251205" fontSize="7.5" fontFamily="sans-serif" textAnchor="middle" opacity="0.75">
                     ♲ RECYCLED
                   </text>
-                  <text x="28" y="109" fill="#251205" fontSize="5.2" fontFamily="monospace" textAnchor="middle" opacity="0.65">
+                  <text x="28" y="109" fill="#251205" fontSize="5.2" fontFamily="sans-serif" textAnchor="middle" opacity="0.65">
                     QC PASS • PK-09
                   </text>
                 </g>
@@ -2580,7 +2769,7 @@ export const Scene1Packing: React.FC = () => {
                     <circle cx="1183" cy="697" r="5" fill="#f59e0b" stroke="#78350f" strokeWidth="2" />
                     <g ref={slidePromptGroupRef} transform="translate(993, 669)" className="pointer-events-none">
                       <rect x="-115" y="-15" width="230" height="24" rx="12" fill="#0a0e17" fillOpacity="0.92" stroke="#fbbf24" strokeWidth="1.2" />
-                      <text x="0" y="1" fill="#fef08a" fontSize="10.5" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
+                      <text x="0" y="1" fill="#fef08a" fontSize="10.5" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" letterSpacing="1.2">
                         SLIDE TAPE TO SEAL BOX ➔
                       </text>
                     </g>
@@ -2607,7 +2796,7 @@ export const Scene1Packing: React.FC = () => {
                 <g transform="translate(785, 735)">
                   <rect width="185" height="115" rx="3.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.2" />
                   <rect x="0" y="0" width="185" height="23" fill="#0f172a" rx="2.5" />
-                  <text x="10" y="16" fill="#f59e0b" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                  <text x="10" y="16" fill="#f59e0b" fontSize="10" fontFamily="sans-serif" fontWeight="bold">
                     LEOPARDS COD EXPRESS
                   </text>
                   <g transform="translate(10, 30)">
@@ -2621,17 +2810,17 @@ export const Scene1Packing: React.FC = () => {
                     <line x1="41" y1="0" x2="41" y2="24" stroke="#000" strokeWidth="3.2" />
                     <line x1="48" y1="0" x2="48" y2="24" stroke="#000" strokeWidth="1.5" />
                   </g>
-                  <text x="80" y="42" fill="#0f172a" fontSize="9.5" fontFamily="monospace" fontWeight="bold">
+                  <text x="80" y="42" fill="#0f172a" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold">
                     DEST: LAHORE, PK
                   </text>
-                  <text x="80" y="54" fill="#475569" fontSize="8" fontFamily="monospace">
+                  <text x="80" y="54" fill="#475569" fontSize="8" fontFamily="sans-serif">
                     TRACK: #PK-8842
                   </text>
                   <rect x="8" y="63" width="169" height="42" rx="2.5" fill="#fef2f2" stroke="#ef4444" strokeWidth="0.8" />
                   <text x="12" y="78" fill="#991b1b" fontSize="8" fontFamily="sans-serif" fontWeight="bold">
                     CASH ON DELIVERY (COD):
                   </text>
-                  <text x="12" y="96" fill="#b91c1c" fontSize="14.5" fontFamily="monospace" fontWeight="bold">
+                  <text x="12" y="96" fill="#b91c1c" fontSize="14.5" fontFamily="sans-serif" fontWeight="bold">
                     RS. 4,500 /-
                   </text>
                 </g>
@@ -2655,7 +2844,7 @@ export const Scene1Packing: React.FC = () => {
                       <circle cx="0" cy="0" r="36" fill="#09090b" fillOpacity="0.04" stroke="#09090b" strokeWidth="1.5" opacity="0.88" />
                       <circle cx="0" cy="0" r="29" fill="none" stroke="#09090b" strokeWidth="1" strokeDasharray="3,3" opacity="0.75" />
                       <g transform="translate(0, -20)">
-                        <text x="0" y="0" fill="#09090b" fontSize="7" fontFamily="monospace" fontWeight="bold" textAnchor="middle" letterSpacing="1.8" opacity="0.85">
+                        <text x="0" y="0" fill="#09090b" fontSize="7" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle" letterSpacing="1.8" opacity="0.85">
                           ★ ★ ★
                         </text>
                       </g>
@@ -2684,19 +2873,27 @@ export const Scene1Packing: React.FC = () => {
                   style={{ touchAction: 'none' }}
                 />
 
-                {/* Typewriter Speech Bubble */}
-                <g ref={speechBubbleGroupRef} transform="translate(740, 260)" style={{ display: 'none' }}>
-                  <polygon points="220,88 240,105 230,88" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                  <rect x="0" y="0" width="440" height="88" rx="16" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.5" />
-                  <rect x="20" y="-10" width="110" height="20" rx="4" fill="#c9a47a" />
-                  <text x="26" y="4" fill="#000000" fontSize="9.5" fontFamily="sans-serif" fontWeight="bold" letterSpacing="1">
-                    TARIQ (PACKER)
-                  </text>
-                  <text ref={speechLine1Ref} x="20" y="36" fill="#ffffff" fontSize="14.5" fontFamily="sans-serif" fontWeight="600" />
-                  <text x="20" y="62" fill="#e2e8f0" fontSize="14.5" fontFamily="sans-serif" fontWeight="600">
-                    <tspan ref={speechLine2TextRef} />
-                    <tspan ref={speechCursorRef} fill="#f59e0b" className="animate-pulse">|</tspan>
-                  </text>
+                {/* Typewriter Speech Bubble (Desktop) */}
+                <g ref={speechBubbleGroupRef} transform="translate(700, 245)" style={{ display: 'none' }}>
+                  <polygon points="220,96 242,128 234,96" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.6" />
+                  <line x1="221" y1="96" x2="233" y2="96" stroke="#0b0f17" strokeWidth="2.5" />
+                  <foreignObject x="0" y="0" width="540" height="116" className="overflow-visible pointer-events-none">
+                    <div
+                      className="relative w-full min-h-[96px] rounded-2xl bg-[#0b0f17]/96 border-[1.6px] border-[#c9a47a] px-5 py-3.5 shadow-[0_12px_28px_rgba(0,0,0,0.85)] flex flex-col justify-center box-border select-none"
+                    >
+                      <div className="absolute -top-3 left-6 bg-[#c9a47a] px-2.5 py-0.5 rounded text-[10px] font-black text-black tracking-wider uppercase shadow-sm">
+                        TARIQ (PACKER)
+                      </div>
+                      <p
+                        ref={speechLine1Ref}
+                        className="font-sans text-[13.5px] font-semibold text-white leading-snug break-words m-0 tracking-wide"
+                      />
+                      <p className="font-sans text-[12px] font-medium text-[#cbd5e1] italic leading-snug mt-1 break-words m-0">
+                        <span ref={speechLine2TextRef} />
+                        <span ref={speechCursorRef} className="text-amber-500 font-bold not-italic ml-0.5 animate-pulse">|</span>
+                      </p>
+                    </div>
+                  </foreignObject>
                 </g>
               </g>
             )}
@@ -2710,7 +2907,7 @@ export const Scene1Packing: React.FC = () => {
               ========================================================================= */}
           <div
             ref={cloudOverlayRef}
-            className="absolute inset-0 z-10 pointer-events-none overflow-hidden transform-gpu"
+            className="absolute inset-0 z-30 pointer-events-none overflow-hidden transform-gpu"
             style={{
               willChange: 'opacity',
               transform: 'translateZ(0)',
@@ -2729,7 +2926,7 @@ export const Scene1Packing: React.FC = () => {
               ========================================================================= */}
           <div
             ref={titleContainerRef}
-            className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden select-none"
+            className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center overflow-hidden select-none"
           >
             <div className="relative w-full max-w-6xl px-4 sm:px-8 flex items-center justify-center">
               {/* Left Parting Wing */}
@@ -2740,10 +2937,10 @@ export const Scene1Packing: React.FC = () => {
                   transform: 'translate3d(0%, 0, 0)',
                 }}
               >
-                <div className="font-mono text-[9px] sm:text-xs text-[#c9a47a] tracking-[0.25em] uppercase font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                <div className="font-mono text-[9px] sm:text-xs text-[#0f172a] tracking-[0.25em] uppercase font-black drop-shadow-[0_2px_8px_rgba(255,255,255,0.85)]">
                   A NARRATIVE JOURNEY
                 </div>
-                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-normal tracking-wide whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
+                <h1 className="font-sans text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-bold tracking-tight whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
                   The Story of
                 </h1>
                 <p className="font-sans text-[10px] sm:text-xs md:text-sm text-[#f4efe8]/90 font-light tracking-wide whitespace-nowrap drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
@@ -2767,10 +2964,10 @@ export const Scene1Packing: React.FC = () => {
                   transform: 'translate3d(0%, 0, 0)',
                 }}
               >
-                <div className="font-mono text-[9px] sm:text-xs text-[#c9a47a] tracking-[0.25em] uppercase font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                <div className="font-mono text-[9px] sm:text-xs text-[#0f172a] tracking-[0.25em] uppercase font-black drop-shadow-[0_2px_8px_rgba(255,255,255,0.85)]">
                   ACROSS PAKISTAN
                 </div>
-                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-normal tracking-wide whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
+                <h1 className="font-sans text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-[#fef08a] font-bold tracking-tight whitespace-nowrap drop-shadow-[0_4px_24px_rgba(0,0,0,0.98)] mt-1 mb-2">
                   a Failed Delivery
                 </h1>
                 <p className="font-sans text-[10px] sm:text-xs md:text-sm text-[#f4efe8]/90 font-light tracking-wide whitespace-nowrap drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
@@ -2789,9 +2986,26 @@ export const Scene1Packing: React.FC = () => {
             </div>
           </div>
         </div>
+  );
+
+  if (embedded) {
+    return stageContent;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full h-[1100vh] bg-[#0b0b0b]"
+      id="movie-scene-1"
+      data-story-scene="true"
+    >
+      <div className="sticky top-0 left-0 w-full h-screen h-dvh overflow-hidden flex items-center justify-center bg-[#07090e]">
+        {stageContent}
       </div>
     </div>
   );
-};
+});
+
+Scene1Packing.displayName = 'Scene1Packing';
 
 export default Scene1Packing;

@@ -1,0 +1,301 @@
+/* From Uiverse.io by Praashoo7 & lucas_5777 - Rasai Auth Theme */
+
+/* Magnetic 55px Grid Auth Container */
+.uiverse-auth-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #0c0c0c;
+  padding: 5.5rem 1.5rem 2.5rem 1.5rem;
+  box-sizing: border-box;
+  font-family: inherit;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Top Screen Branding Header */
+.rasai-screen-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  padding: 1.25rem 2.25rem;
+  z-index: 50;
+  box-sizing: border-box;
+}
+
+.rasai-header-inner {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 640px) {
+  .rasai-screen-header {
+    padding: 1rem 1.25rem;
+  }
+  .uiverse-auth-wrapper {
+    padding-top: 5rem;
+    padding-bottom: 2rem;
+  }
+}
+
+.uiverse-container {
+  width: 100%;
+  max-width: 370px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Uiverse Form Card by Praashoo7 */
+.uiverse-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 2em;
+  padding-right: 2em;
+  padding-bottom: 0.8em;
+  background-color: #171717;
+  border-radius: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  transition: transform 0.4s ease-in-out, border-color 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
+  box-sizing: border-box;
+}
+
+.uiverse-form:hover {
+  transform: scale(1.03);
+  border: 1px solid #2a2a2a;
+  box-shadow: 0 15px 40px -10px rgba(0, 0, 0, 0.95);
+}
+
+.uiverse-heading {
+  text-align: center;
+  margin: 1.8em 0 1.2em 0;
+  color: rgb(255, 255, 255);
+  font-size: 1.25em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.uiverse-subheading {
+  text-align: center;
+  margin-top: -0.8em;
+  margin-bottom: 1.2em;
+  color: #888888;
+  font-size: 0.78em;
+}
+
+.uiverse-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  border-radius: 25px;
+  padding: 0.65em 0.9em;
+  border: none;
+  outline: none;
+  color: white;
+  background-color: #171717;
+  box-shadow: inset 2px 5px 10px rgb(5, 5, 5);
+  transition: box-shadow 0.2s ease;
+}
+
+.uiverse-field:focus-within {
+  box-shadow: inset 2px 5px 10px rgb(2, 2, 2), 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.uiverse-input-icon {
+  height: 1.25em;
+  width: 1.25em;
+  fill: #e5e5e5;
+  color: #e5e5e5;
+  flex-shrink: 0;
+}
+
+.uiverse-input-field {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  width: 100%;
+  color: #d3d3d3;
+  font-size: 0.88em;
+  font-family: inherit;
+}
+
+/* Eliminate browser autofill rectangular highlight and retain inset card dark theme */
+.uiverse-input-field:-webkit-autofill,
+.uiverse-input-field:-webkit-autofill:hover,
+.uiverse-input-field:-webkit-autofill:focus,
+.uiverse-input-field:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #171717 inset !important;
+  -webkit-text-fill-color: #d3d3d3 !important;
+  caret-color: #d3d3d3 !important;
+  transition: background-color 99999s ease-in-out 0s;
+  background-color: transparent !important;
+}
+
+.uiverse-input-field:focus,
+.uiverse-input-field:active {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.uiverse-input-field::placeholder {
+  color: #666666;
+}
+
+.uiverse-toggle-btn {
+  background: none;
+  border: none;
+  outline: none;
+  color: #777777;
+  cursor: pointer;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.uiverse-toggle-btn:hover {
+  color: #ffffff;
+}
+
+.uiverse-btn-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+  margin-top: 1.8em;
+  gap: 8px;
+}
+
+.uiverse-button1 {
+  flex: 1;
+  padding: 0.55em 1.1em;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  transition: 0.35s ease-in-out;
+  background-color: #252525;
+  color: white;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.uiverse-button1:hover:not(:disabled) {
+  background-color: black;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.uiverse-button1:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uiverse-button2 {
+  flex: 1;
+  padding: 0.55em 1.1em;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  transition: 0.35s ease-in-out;
+  background-color: #252525;
+  color: white;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.uiverse-button2:hover:not(:disabled) {
+  background-color: black;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.uiverse-button3 {
+  margin-top: 4px;
+  margin-bottom: 2em;
+  padding: 0.55em 1em;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  transition: 0.35s ease-in-out;
+  background-color: #252525;
+  color: white;
+  font-size: 0.82em;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.uiverse-button3:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+/* Helper banners */
+.uiverse-error-box {
+  background-color: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #fca5a5;
+  font-size: 0.75em;
+  padding: 0.6em 0.8em;
+  border-radius: 12px;
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.uiverse-info-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 0.72em;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.uiverse-demo-link {
+  color: #67e8f9;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.72em;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.uiverse-demo-link:hover {
+  color: #a5f3fc;
+}

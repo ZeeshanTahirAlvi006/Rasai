@@ -1,3 +1,5 @@
+// src/importBatch/importBatch.router.ts
+// Express router defining endpoints for CSV import batch initiation, S3 commits, and progress querying.
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { validate } from '../middleware/validate.js';

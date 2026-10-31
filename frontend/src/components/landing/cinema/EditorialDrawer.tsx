@@ -63,7 +63,7 @@ export const EditorialDrawer: React.FC<EditorialDrawerProps> = ({
               <span>•</span>
               <span className="text-white/40">SPEC REF: {specSection}</span>
             </div>
-            <h2 className="font-serif text-3xl sm:text-4xl leading-tight font-normal text-white">
+            <h2 className="font-sans text-3xl sm:text-4xl leading-tight font-bold text-white">
               {title}
             </h2>
             <p className="font-sans text-xs sm:text-sm text-[#f4efe8]/70 mt-1">

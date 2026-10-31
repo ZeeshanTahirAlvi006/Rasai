@@ -18,6 +18,15 @@ import {
   ImportBatch,
   ImportChunk,
   carrierHealthModel,
+  MerchantWaTemplate,
+  OpsAlert,
+  CarrierStation,
+  userModel,
+  sessionModel,
+  otpModel,
+  MerchantCarrierCredential,
+  CprDispute,
+  CdrRecord,
 } from '../models';
 
 const models = [
@@ -30,6 +39,15 @@ const models = [
   { name: 'ImportBatch', model: ImportBatch },
   { name: 'ImportChunk', model: ImportChunk },
   { name: 'CarrierHealth', model: carrierHealthModel },
+  { name: 'MerchantWaTemplate', model: MerchantWaTemplate },
+  { name: 'OpsAlert', model: OpsAlert },
+  { name: 'CarrierStation', model: CarrierStation },
+  { name: 'User', model: userModel },
+  { name: 'Session', model: sessionModel },
+  { name: 'Otp', model: otpModel },
+  { name: 'MerchantCarrierCredential', model: MerchantCarrierCredential },
+  { name: 'CprDispute', model: CprDispute },
+  { name: 'CdrRecord', model: CdrRecord },
 ];
 
 async function syncAllIndexes(): Promise<void> {
@@ -48,7 +66,32 @@ async function syncAllIndexes(): Promise<void> {
       process.stdout.write(`⏳ Syncing indexes for [${name}] (${model.collection.collectionName})... `);
 
       // createIndexes builds indexes additively without dropping existing ones in production
-      await model.createIndexes();
+      try {
+        if (name === 'Otp') {
+          await model.collection.dropIndex('otpHash_1_reason_1_createdAT_-1').catch(() => {});
+        }
+        await model.createIndexes();
+      } catch (createErr: any) {
+        // Handle index migration conflict when options or keys were updated (B2-RC-07)
+        if (
+          createErr.message?.includes('same name as the requested index') ||
+          createErr.code === 85 ||
+          createErr.code === 86 ||
+          createErr.codeName === 'IndexOptionsConflict' ||
+          createErr.codeName === 'IndexKeySpecsConflict'
+        ) {
+          const match = createErr.message?.match(/name:\s*"([^"]+)"/);
+          if (match && match[1]) {
+            process.stdout.write(`⚠️  Recreating updated index [${match[1]}]... `);
+            await model.collection.dropIndex(match[1]).catch(() => {});
+            await model.createIndexes();
+          } else {
+            throw createErr;
+          }
+        } else {
+          throw createErr;
+        }
+      }
 
       const activeIndexes = await model.collection.indexes();
       const indexNames = activeIndexes.map((idx: any) => idx.name).join(', ');

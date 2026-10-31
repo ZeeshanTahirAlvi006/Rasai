@@ -58,7 +58,7 @@ export const ResolutionSection: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-end">
           <h2
-            className={`md:col-span-8 font-serif text-[clamp(2.5rem,5.5vw,4.5rem)] leading-[1.02] tracking-[-0.02em] font-normal ${isDark ? 'text-white' : 'text-[#0b0b0b]'
+            className={`md:col-span-8 font-sans font-semibold text-[clamp(2.5rem,5.5vw,4.5rem)] leading-[1.02] tracking-[-0.02em] ${isDark ? 'text-white' : 'text-[#0b0b0b]'
               }`}
           >
             Eliminating Failed Attempts And Rider Fraud Before Return To Origin
@@ -95,7 +95,7 @@ export const ResolutionSection: React.FC = () => {
                 </span>
               </div>
               <h3
-                className={`font-serif text-[clamp(1.75rem,2.8vw,2.5rem)] leading-tight mb-4 uppercase font-normal ${isDark ? 'text-white' : 'text-slate-900'
+                className={`font-sans font-semibold text-[clamp(1.75rem,2.8vw,2.5rem)] leading-tight mb-4 uppercase ${isDark ? 'text-white' : 'text-slate-900'
                   }`}
               >
                 {step.title}
@@ -146,7 +146,7 @@ export const ResolutionSection: React.FC = () => {
       >
         <div>
           <span
-            className={`font-serif text-2xl md:text-3xl uppercase block mb-2 font-normal ${isDark ? 'text-white' : 'text-slate-900'
+            className={`font-sans font-semibold text-2xl md:text-3xl uppercase block mb-2 ${isDark ? 'text-white' : 'text-slate-900'
               }`}
           >
             READY TO RECOVER FAILED SHIPMENTS?

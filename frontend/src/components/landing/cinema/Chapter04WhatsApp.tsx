@@ -49,7 +49,7 @@ export const Chapter04WhatsApp: React.FC = () => {
             <span>04 / 05 • THE CUSTOMER HANDSHAKE • LIVE WHATSAPP</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-5xl font-normal leading-[1.08] text-white tracking-tight">
+          <h2 className="font-sans text-3xl sm:text-5xl font-bold leading-[1.08] text-white tracking-tight">
             Conversational Rescue: In 3 Taps Under 60 Seconds
           </h2>
 

@@ -214,7 +214,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               key={link.label}
               href={link.href}
               onClick={() => setIsMenuOpen(false)}
-              className={`font-serif text-[clamp(2.5rem,10vw,4rem)] leading-[1.1] transition-opacity duration-200 tracking-[-0.01em] hover:opacity-60 ${
+              className={`font-sans font-medium text-[clamp(2.5rem,10vw,4rem)] leading-[1.1] transition-opacity duration-200 tracking-[-0.01em] hover:opacity-60 ${
                 isDark ? 'text-[#f4efe8]' : 'text-[#0b0b0b]'
               }`}
             >

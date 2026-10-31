@@ -1,3 +1,5 @@
+// src/importBatch/ImportChunk.model.ts
+// Mongoose schema and model for 500-row tracking event import chunks with 30-day completion TTL.
 import mongoose, { Schema, Types } from 'mongoose';
 import type { Carrier } from '../types/index.js';
 
