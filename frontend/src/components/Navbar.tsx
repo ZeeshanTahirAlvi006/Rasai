@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Activity, ShieldCheck, Truck, Zap, LogOut, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,7 +14,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   systemHealthy = true,
 }) => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-white/10 px-4 lg:px-8 py-3.5 transition-all">
@@ -107,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <button
-              onClick={() => logout()}
+              onClick={handleLogout}
               title="Sign Out"
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
             >

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { LOGO_PATHS, FRAME_TRANSFORMS } from './logoData';
+import { RasaiUrduCalligraphy } from '../common/RasaiUrduCalligraphy';
 
 export interface RasaiChoreographyProps {
   className?: string;
@@ -1747,35 +1748,33 @@ export const RasaiChoreography: React.FC<RasaiChoreographyProps> = ({
               gap: 'calc(var(--emblem-h, 160px) * 0.16)',
             }}
           >
-            {/* Top Half: Urdu calligraphy (matching mobile header font-urdu) */}
+            {/* Top Half: Urdu calligraphy (matching authentic brand calligraphy) */}
             <div className="relative flex items-center justify-center w-full">
-              <span
-                dir="rtl"
-                lang="ur"
-                className="font-urdu font-normal leading-[1.3] text-white select-none flex items-center justify-center w-full pb-1 sm:pb-2"
+              <RasaiUrduCalligraphy
+                variant="white"
                 style={{
-                  fontSize: 'calc(var(--emblem-h, 160px) * 0.42)',
+                  height: 'calc(var(--emblem-h, 160px) * 0.44)',
                 }}
-              >
-                رسائی
-              </span>
+                className="select-none flex items-center justify-center pb-1 sm:pb-2"
+              />
               <span
                 ref={urduGlareRef}
-                dir="rtl"
-                lang="ur"
                 aria-hidden="true"
-                className="absolute inset-0 font-urdu font-normal leading-[1.3] select-none flex items-center justify-center w-full pb-1 sm:pb-2 pointer-events-none"
+                className="absolute inset-0 select-none flex items-center justify-center w-full pb-1 sm:pb-2 pointer-events-none"
                 style={{
-                  fontSize: 'calc(var(--emblem-h, 160px) * 0.42)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mixBlendMode: 'screen',
+                  height: 'calc(var(--emblem-h, 160px) * 0.44)',
+                  WebkitMaskImage: 'url(/rasai_urdu_white.png)',
+                  maskImage: 'url(/rasai_urdu_white.png)',
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center',
                   opacity: 0,
+                  mixBlendMode: 'screen',
                 }}
-              >
-                رسائی
-              </span>
+              />
             </div>
 
             {/* Bottom Half: English "rasai" matched in visual width & weight to the emblem */}

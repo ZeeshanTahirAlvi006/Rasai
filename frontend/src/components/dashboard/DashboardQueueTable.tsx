@@ -77,13 +77,13 @@ export const DashboardQueueTable: React.FC<DashboardQueueTableProps> = ({
           <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
             Status
           </TableHead>
-          <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
             Attempt
           </TableHead>
-          <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
             Station
           </TableHead>
-          <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right">
+          <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right">
             Amount
           </TableHead>
           <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right">
@@ -121,18 +121,18 @@ export const DashboardQueueTable: React.FC<DashboardQueueTableProps> = ({
                   {statusLabel}
                 </TableCell>
 
-                {/* 3. Attempt */}
-                <TableCell className="py-2.5 px-3 font-bold text-amber-500 dark:text-amber-400">
+                {/* 3. Attempt (hidden on mobile and tablet) */}
+                <TableCell className="hidden xl:table-cell py-2.5 px-3 font-bold text-amber-500 dark:text-amber-400">
                   #{shipment.ndrAttempt ?? 1}
                 </TableCell>
 
-                {/* 4. Station */}
-                <TableCell className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400">
+                {/* 4. Station (hidden on mobile and tablet) */}
+                <TableCell className="hidden xl:table-cell py-2.5 px-3 text-zinc-600 dark:text-zinc-400">
                   {shipment.destinationStationCode || 'UNASSIGNED'}
                 </TableCell>
 
-                {/* 5. Amount */}
-                <TableCell className="py-2.5 px-3 text-right font-bold text-amber-500 dark:text-amber-400 tabular-nums">
+                {/* 5. Amount (hidden on mobile and tablet) */}
+                <TableCell className="hidden xl:table-cell py-2.5 px-3 text-right font-bold text-amber-500 dark:text-amber-400 tabular-nums">
                   PKR {shipment.orderValueCOD?.toLocaleString() ?? 0}
                 </TableCell>
 

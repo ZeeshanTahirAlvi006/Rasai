@@ -93,6 +93,7 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
     // Left Half (Kamran under Flyover) Refs
     const parcelCardRefs = useRef<Array<HTMLDivElement | null>>([]);
     const parcelStampRefs = useRef<Array<HTMLDivElement | null>>([]);
+    const parcelInfoRefs = useRef<Array<HTMLDivElement | null>>([]);
     const remainingCounterRef = useRef<HTMLSpanElement>(null);
     const leftRedFlashRef = useRef<HTMLDivElement>(null);
     const kamranBubbleRef = useRef<SVGGElement>(null);
@@ -340,21 +341,36 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
       // (0.46 -> 0.76)
       // -----------------------------------------------------------------------
       let swipedCount = 0;
-      PARCEL_QUEUE.forEach((_, idx) => {
+      PARCEL_QUEUE.forEach((item, idx) => {
         const cardStart = 0.46 + idx * 0.035;
         const swipeT = Math.max(0, Math.min(1, (progress - cardStart) / 0.055));
         if (swipeT > 0.6) swipedCount++;
 
         const cardEl = parcelCardRefs.current[idx];
         const stampEl = parcelStampRefs.current[idx];
+        const infoEl = parcelInfoRefs.current[idx];
+
         if (cardEl) {
-          const shiftX = -swipeT * 22;
-          cardEl.style.transform = `translate3d(${shiftX.toFixed(1)}px, 0, 0)`;
           cardEl.style.borderColor =
-            swipeT > 0.4 ? 'rgba(239, 68, 68, 0.75)' : 'rgba(51, 65, 85, 0.7)';
+            swipeT > 0.35
+              ? 'rgba(239, 68, 68, 0.85)'
+              : item.isTarget
+              ? 'rgba(251, 191, 36, 0.6)'
+              : 'rgba(51, 65, 85, 0.7)';
+          cardEl.style.backgroundColor =
+            swipeT > 0.35
+              ? 'rgba(36, 6, 6, 0.95)'
+              : item.isTarget
+              ? 'rgba(15, 23, 42, 0.95)'
+              : 'rgba(15, 23, 42, 0.6)';
+        }
+        if (infoEl) {
+          infoEl.style.opacity = (1 - swipeT).toFixed(3);
+          infoEl.style.display = swipeT >= 0.99 ? 'none' : 'block';
         }
         if (stampEl) {
           stampEl.style.opacity = swipeT.toFixed(3);
+          stampEl.style.display = swipeT > 0.01 ? 'flex' : 'none';
         }
       });
 
@@ -1233,33 +1249,41 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                         ref={(el) => {
                           parcelCardRefs.current[idx] = el;
                         }}
-                        className={`relative rounded-lg p-1 sm:p-1.5 border transition-colors overflow-hidden ${
+                        className={`relative rounded-lg p-1 sm:p-1.5 border transition-colors overflow-hidden min-h-[36px] sm:min-h-[42px] flex flex-col justify-center ${
                           item.isTarget
                             ? 'bg-slate-900/95 border-amber-400/60'
                             : 'bg-slate-900/60 border-slate-800'
                         }`}
                       >
-                        <div className="flex items-center justify-between text-[7.5px] sm:text-[9px] md:text-[10px] font-mono leading-tight">
-                          <span className="font-bold text-white truncate max-w-[68%]">
-                            {item.id} • {item.recipient}
-                          </span>
-                          <span className="text-emerald-400 font-bold shrink-0">{item.cod}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5 text-[6.5px] sm:text-[8px] md:text-[8.5px] text-slate-400 leading-tight">
-                          <span className="truncate pr-1">{item.address}</span>
-                          <span className="font-mono text-amber-400 shrink-0 font-bold">{item.dist}</span>
+                        {/* Normal Parcel Information Container (Fades out cleanly when status changes) */}
+                        <div
+                          ref={(el) => {
+                            parcelInfoRefs.current[idx] = el;
+                          }}
+                          className="w-full"
+                        >
+                          <div className="flex items-center justify-between text-[7.5px] sm:text-[9px] md:text-[10px] font-mono leading-tight">
+                            <span className="font-bold text-white truncate max-w-[68%]">
+                              {item.id} • {item.recipient}
+                            </span>
+                            <span className="text-emerald-400 font-bold shrink-0">{item.cod}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-0.5 text-[6.5px] sm:text-[8px] md:text-[8.5px] text-slate-400 leading-tight">
+                            <span className="truncate pr-1">{item.address}</span>
+                            <span className="font-mono text-amber-400 shrink-0 font-bold">{item.dist}</span>
+                          </div>
                         </div>
 
-                        {/* Red Ghost Scan Stamp Overlay (Perfect Corner-to-Corner Fit) */}
+                        {/* Customer Unavailable Status Overlay (Changes in same position, no bleed-through) */}
                         <div
                           ref={(el) => {
                             parcelStampRefs.current[idx] = el;
                           }}
-                          className="absolute inset-0 rounded-[inherit] bg-red-950/95 border border-red-500 flex items-center justify-center px-1 pointer-events-none box-border"
-                          style={{ opacity: 0 }}
+                          className="absolute inset-0 rounded-[inherit] bg-[#220606] border border-red-500/80 flex items-center justify-center px-1.5 pointer-events-none box-border shadow-inner"
+                          style={{ opacity: 0, display: 'none' }}
                         >
-                          <span className="font-mono text-[7px] sm:text-[8.5px] md:text-[9px] font-black tracking-wider text-red-200 uppercase text-center leading-tight select-none">
-                            ✕ MARKED: CUSTOMER UNAVAILABLE
+                          <span className="font-mono text-[7.5px] sm:text-[9px] md:text-[10px] font-black tracking-wider text-red-200 uppercase text-center leading-tight select-none">
+                            Customer Unavailable
                           </span>
                         </div>
                       </div>

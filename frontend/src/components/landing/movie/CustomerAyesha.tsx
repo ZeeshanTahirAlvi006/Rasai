@@ -193,6 +193,56 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             <stop offset="100%" stopColor="#d97706" stopOpacity="0.7" />
           </linearGradient>
 
+          {/* Luminous Warm Window Sunlight Rim (Golden Hour Dawn) */}
+          <linearGradient id="ayeshaSunlightRim" x1="0%" y1="0%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="#fef08a" stopOpacity="0.95" />
+            <stop offset="35%" stopColor="#f59e0b" stopOpacity="0.75" />
+            <stop offset="70%" stopColor="#d97706" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
+          </linearGradient>
+
+          {/* Deep Amber-Espresso 3D Iris Shader with Limbal Ring */}
+          <radialGradient id="ayeshaIris3D" cx="42%" cy="38%" r="58%">
+            <stop offset="0%" stopColor="#854d0e" />
+            <stop offset="35%" stopColor="#451a03" />
+            <stop offset="75%" stopColor="#291307" />
+            <stop offset="100%" stopColor="#090504" />
+          </radialGradient>
+
+          {/* High-Luster 18K Yellow Gold with Mirror Specular */}
+          <linearGradient id="ayeshaGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#78350f" />
+            <stop offset="18%" stopColor="#d97706" />
+            <stop offset="38%" stopColor="#fbbf24" />
+            <stop offset="52%" stopColor="#ffffff" />
+            <stop offset="68%" stopColor="#f59e0b" />
+            <stop offset="85%" stopColor="#b45309" />
+            <stop offset="100%" stopColor="#78350f" />
+          </linearGradient>
+
+          {/* Luminous Natural Pearl Gradient */}
+          <radialGradient id="ayeshaPearlGrad" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="45%" stopColor="#fffbeb" />
+            <stop offset="80%" stopColor="#fef3c7" />
+            <stop offset="100%" stopColor="#cbd5e1" />
+          </radialGradient>
+
+          {/* Natural Manicure Fingernail Gloss */}
+          <linearGradient id="ayeshaNailGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffe4e6" stopOpacity="0.9" />
+            <stop offset="45%" stopColor="#fecdd3" stopOpacity="0.8" />
+            <stop offset="85%" stopColor="#fda4af" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.5" />
+          </linearGradient>
+
+          {/* Scalloped Organza Lace Cuff Semi-Transparent Shader */}
+          <linearGradient id="ayeshaOrganzaLace" x1="0%" y1="0%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.85" />
+            <stop offset="50%" stopColor="#2dd4bf" stopOpacity="0.65" />
+            <stop offset="100%" stopColor="#0d9488" stopOpacity="0.88" />
+          </linearGradient>
+
           {/* Polished Walnut Dining Table Surface Gradient */}
           <linearGradient id="walnutTableSurface" x1="15%" y1="0%" x2="85%" y2="100%">
             <stop offset="0%" stopColor="#853d14" />
@@ -366,133 +416,327 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
         </g>
 
         {/* ================================================================= */}
-        {/* 2. AYESHA TORSO, KURTA, DUPATTA & LEFT ARM                         */}
+        {/* 2. AYESHA TORSO, LAWN KURTA, DUPATTA & ARTICULATED LEFT ARM       */}
         {/* ================================================================= */}
         <g id="ayesha-upper-body">
-          {/* Flowing Hair Back Layer */}
+          {/* Volumetric Back Hair Base & Falling Shoulder Strands */}
           <path
-            d="M 488 345 C 460 390, 462 465, 480 515 C 510 525, 580 520, 600 495 C 612 450, 608 385, 582 345 Z"
+            d="M 488 345 C 455 385, 452 460, 474 515 C 504 532, 582 528, 608 495 C 622 445, 616 380, 582 345 Z"
             fill="url(#ayeshaHairGrad)"
+          />
+          {/* Layered Hair Depth Shadow & Loose Shoulder Curls */}
+          <path
+            d="M 470 410 C 454 445, 456 490, 472 522 C 478 520, 484 510, 480 488 C 476 462, 474 435, 478 412 Z"
+            fill="#090504"
+            opacity="0.82"
+          />
+          <path
+            d="M 464 458 C 458 488, 466 524, 476 534"
+            fill="none"
+            stroke="#23140d"
+            strokeWidth="1.8"
+            strokeLinecap="round"
           />
 
           {/* Left Arm (Further from camera, resting near laptop/teacup) */}
           <g id="ayesha-left-arm">
-            {/* Upper Left Sleeve */}
+            {/* Upper Left Sleeve with Anatomical Fabric Folds */}
             <path
-              d="M 492 468 C 465 480, 440 525, 425 575 L 462 588 C 475 548, 495 512, 514 492 Z"
-              fill="#0f766e"
+              d="M 492 468 C 465 480, 438 522, 422 575 L 464 588 C 478 545, 498 510, 516 490 Z"
+              fill="url(#ayeshaKurtaGrad)"
               stroke="#042f2e"
-              strokeWidth="1.5"
+              strokeWidth="1.6"
             />
-            {/* Left Forearm & Wrist extending onto Table */}
+            {/* Upper Arm Inseam & Tension Crease */}
             <path
-              d="M 425 575 C 410 605, 382 628, 348 638 L 356 658 C 398 652, 436 628, 462 588 Z"
+              d="M 470 495 C 452 525, 442 555, 436 578"
+              fill="none"
+              stroke="#042f2e"
+              strokeWidth="1.6"
+              opacity="0.6"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 454 532 C 464 544, 476 550, 488 546"
+              fill="none"
+              stroke="#2dd4bf"
+              strokeWidth="1.1"
+              opacity="0.35"
+              strokeLinecap="round"
+            />
+
+            {/* Left Forearm & Wrist extending onto Walnut Table */}
+            <path
+              d="M 422 575 C 406 605, 378 628, 344 638 L 354 658 C 396 652, 434 626, 464 588 Z"
               fill="url(#ayeshaLimbSkin)"
               stroke="#7d482a"
               strokeWidth="1.2"
             />
-            {/* Embroidered Kurta Cuff */}
+            {/* Forearm Muscle & Tendon Shading */}
             <path
-              d="M 420 572 L 463 586 L 456 600 L 414 585 Z"
-              fill="#115e59"
-              stroke="#fbbf24"
+              d="M 416 592 C 396 616, 376 634, 352 642"
+              fill="none"
+              stroke="#a66843"
               strokeWidth="1.2"
+              opacity="0.4"
+              strokeLinecap="round"
             />
-            {/* Sculpted Left Hand resting gracefully on table */}
+
+            {/* Scalloped Organza Lace Cuff with Gold Zari Border */}
             <path
-              d="M 348 638 C 330 638, 314 644, 308 652 C 306 658, 318 662, 336 660 L 358 658 Z"
+              d="M 416 572 L 465 586 L 458 602 L 410 586 Z"
+              fill="url(#ayeshaOrganzaLace)"
+              stroke="#0d9488"
+              strokeWidth="1"
+            />
+            <path
+              d="M 416 572 L 465 586"
+              fill="none"
+              stroke="#fbbf24"
+              strokeWidth="1.6"
+              strokeDasharray="4 2"
+            />
+            {/* Delicate Lace Cutwork Eyelets on Cuff */}
+            <circle cx="424" cy="580" r="1.2" fill="#ffffff" opacity="0.8" />
+            <circle cx="434" cy="583" r="1.2" fill="#ffffff" opacity="0.8" />
+            <circle cx="444" cy="586" r="1.2" fill="#ffffff" opacity="0.8" />
+            <circle cx="454" cy="589" r="1.2" fill="#ffffff" opacity="0.8" />
+
+            {/* Fully Articulated Sculpted Left Hand & Fingers Resting on Wood */}
+            {/* Palm Base & Thumb */}
+            <path
+              d="M 344 638 C 332 638, 322 642, 316 646 C 314 649, 318 652, 328 650 L 344 646 Z"
               fill="url(#ayeshaSkin3D)"
               stroke="#7d482a"
               strokeWidth="1.1"
             />
+            {/* Index Finger */}
+            <path
+              d="M 330 645 C 318 646, 306 648, 296 650 C 294 652, 296 655, 300 655 C 310 654, 322 652, 334 651 Z"
+              fill="url(#ayeshaSkin3D)"
+              stroke="#7d482a"
+              strokeWidth="1"
+            />
+            <ellipse cx="298" cy="652.5" rx="2.5" ry="1.2" fill="url(#ayeshaNailGrad)" />
+            <ellipse cx="297.5" cy="652" rx="1.2" ry="0.6" fill="#ffffff" opacity="0.65" />
+
+            {/* Middle Finger (Longest, gently resting on table) */}
+            <path
+              d="M 334 651 C 320 653, 304 655, 292 657 C 290 659, 292 662, 296 662 C 308 661, 322 659, 336 657 Z"
+              fill="url(#ayeshaSkin3D)"
+              stroke="#7d482a"
+              strokeWidth="1"
+            />
+            <ellipse cx="294" cy="659.5" rx="2.5" ry="1.2" fill="url(#ayeshaNailGrad)" />
+            <ellipse cx="293.5" cy="659" rx="1.2" ry="0.6" fill="#ffffff" opacity="0.65" />
+
+            {/* Ring Finger */}
+            <path
+              d="M 336 657 C 322 659, 310 662, 300 664 C 298 666, 300 668, 304 668 C 314 666, 324 664, 338 662 Z"
+              fill="url(#ayeshaSkin3D)"
+              stroke="#7d482a"
+              strokeWidth="1"
+            />
+            <ellipse cx="302" cy="666" rx="2.3" ry="1.1" fill="url(#ayeshaNailGrad)" />
+
+            {/* Little Finger */}
+            <path
+              d="M 338 662 C 326 665, 316 668, 308 670 C 306 672, 308 674, 312 674 C 320 672, 330 669, 342 666 Z"
+              fill="url(#ayeshaSkin3D)"
+              stroke="#7d482a"
+              strokeWidth="1"
+            />
+            <ellipse cx="310" cy="672" rx="2.1" ry="1" fill="url(#ayeshaNailGrad)" />
+
+            {/* Finger Knuckle Creases */}
+            <line x1="318" y1="648" x2="319" y2="652" stroke="#a66843" strokeWidth="0.8" opacity="0.6" />
+            <line x1="314" y1="655" x2="315" y2="659" stroke="#a66843" strokeWidth="0.8" opacity="0.6" />
           </g>
 
-          {/* Main Torso & Embroidered Sage-Teal Kurta */}
+          {/* Main Torso & Embroidered Sage-Teal Lawn Kurta */}
           <path
-            d="M 482 458 C 515 446, 568 446, 598 462 C 622 515, 628 595, 624 670 L 460 670 C 458 595, 464 515, 482 458 Z"
+            d="M 482 458 C 515 446, 568 446, 598 462 C 624 515, 630 595, 626 670 L 458 670 C 456 595, 464 515, 482 458 Z"
             fill="url(#ayeshaKurtaGrad)"
             stroke="#042f2e"
             strokeWidth="1.8"
           />
 
-          {/* Subtle Anatomical Bust & Torso Fabric Drape Creases */}
+          {/* Realistic Anatomical Fabric Drape & Tension Creases (Across Bust & Midriff) */}
           <path
-            d="M 488 535 C 512 552, 548 550, 568 532"
+            d="M 486 525 C 510 545, 546 544, 570 524"
             fill="none"
             stroke="#042f2e"
-            strokeWidth="1.8"
+            strokeWidth="2"
             opacity="0.45"
             strokeLinecap="round"
           />
           <path
-            d="M 495 578 C 525 590, 562 588, 590 572"
+            d="M 488 532 C 512 550, 548 548, 568 530"
+            fill="none"
+            stroke="#2dd4bf"
+            strokeWidth="1"
+            opacity="0.3"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 494 572 C 522 586, 558 584, 588 568"
+            fill="none"
+            stroke="#042f2e"
+            strokeWidth="1.8"
+            opacity="0.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 496 578 C 524 592, 560 590, 590 574"
             fill="none"
             stroke="#5eead4"
-            strokeWidth="1.2"
+            strokeWidth="1.1"
             opacity="0.25"
             strokeLinecap="round"
           />
 
-          {/* Traditional Gold Zari Embroidered Kurta Neckline (Gala) */}
+          {/* Intricate Gold Zari Neckline (Gala) with Mughal Vine Filigree */}
           <path
-            d="M 510 456 Q 534 494 562 456"
+            d="M 508 456 Q 534 496 564 456"
             fill="none"
+            stroke="url(#ayeshaGoldGrad)"
+            strokeWidth="3.4"
+            strokeLinecap="round"
+          />
+          {/* Inner Resham Floral Embroidery Accents on Gala */}
+          <path
+            d="M 514 460 Q 534 490 558 460"
+            fill="none"
+            stroke="#fde68a"
+            strokeWidth="1.2"
+            strokeDasharray="3 3"
+          />
+          {/* Symmetrical Resham Floral Paisley Motifs Framing Gala */}
+          <path
+            d="M 504 468 C 498 480, 506 488, 514 480 C 518 474, 510 466, 504 468 Z"
+            fill="#0f766e"
             stroke="#fbbf24"
-            strokeWidth="3"
+            strokeWidth="1"
+          />
+          <circle cx="508" cy="478" r="1.4" fill="#fbbf24" />
+          <path
+            d="M 568 468 C 574 480, 566 488, 558 480 C 554 474, 562 466, 568 468 Z"
+            fill="#0f766e"
+            stroke="#fbbf24"
+            strokeWidth="1"
+          />
+          <circle cx="564" cy="478" r="1.4" fill="#fbbf24" />
+
+          {/* Embroidered Kurta Placket (Patti) with Gold Border & Stitch Tracks */}
+          <rect x="531" y="482" width="8" height="74" fill="#0f766e" stroke="url(#ayeshaGoldGrad)" strokeWidth="1.2" rx="1.5" />
+          <line x1="535" y1="484" x2="535" y2="554" stroke="#fbbf24" strokeWidth="1" strokeDasharray="3 2" />
+
+          {/* Luminous Natural Pearl Buttons with Gold Prong Settings */}
+          <circle cx="535" cy="494" r="2.6" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.8" />
+          <circle cx="535" cy="494" r="0.8" fill="#ffffff" />
+          <circle cx="535" cy="512" r="2.6" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.8" />
+          <circle cx="535" cy="512" r="0.8" fill="#ffffff" />
+          <circle cx="535" cy="530" r="2.6" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.8" />
+          <circle cx="535" cy="530" r="0.8" fill="#ffffff" />
+          <circle cx="535" cy="548" r="2.6" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.8" />
+          <circle cx="535" cy="548" r="0.8" fill="#ffffff" />
+
+          {/* Draped Ivory Chiffon Dupatta with Translucent Sheen & Soft Drop Shadow */}
+          <path
+            d="M 474 460 C 494 452, 518 466, 532 504 C 546 548, 578 595, 620 625 L 626 670 L 550 670 C 518 620, 486 558, 468 492 Z"
+            fill="url(#ayeshaDupattaGrad)"
+            stroke="#f59e0b"
+            strokeWidth="1.4"
+          />
+          {/* Chiffon Secondary Drape Layer & Natural Fabric Waves */}
+          <path
+            d="M 488 472 C 506 512, 532 575, 564 645 C 576 652, 594 656, 612 654"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.4"
+            opacity="0.65"
             strokeLinecap="round"
           />
           <path
-            d="M 535 478 L 535 552"
+            d="M 502 520 C 522 562, 546 618, 578 668"
             fill="none"
-            stroke="#fbbf24"
-            strokeWidth="2.2"
-            strokeDasharray="5 4"
+            stroke="#fef08a"
+            strokeWidth="1"
+            opacity="0.45"
+            strokeLinecap="round"
           />
-          {/* Tiny Pearl Buttons on Placket */}
-          <circle cx="535" cy="492" r="2.3" fill="#fef3c7" stroke="#b45309" strokeWidth="0.8" />
-          <circle cx="535" cy="510" r="2.3" fill="#fef3c7" stroke="#b45009" strokeWidth="0.8" />
-          <circle cx="535" cy="528" r="2.3" fill="#fef3c7" stroke="#b45009" strokeWidth="0.8" />
 
-          {/* Draped Ivory & Gold-Edged Chiffon Dupatta Across Shoulder */}
+          {/* Metallic Kiran / Gota Lace Border Trim Along Dupatta Hem */}
           <path
-            d="M 476 462 C 495 455, 520 468, 532 505 C 546 548, 578 595, 618 625 L 624 668 L 552 668 C 520 620, 488 558, 470 492 Z"
-            fill="url(#ayeshaDupattaGrad)"
-            stroke="#f59e0b"
-            strokeWidth="1.6"
-          />
-          {/* Dupatta Zari Border Trim */}
-          <path
-            d="M 482 464 C 504 515, 536 585, 572 665"
+            d="M 480 462 C 502 514, 534 584, 570 666"
             fill="none"
-            stroke="#d97706"
-            strokeWidth="2.5"
-            strokeDasharray="8 4"
-            opacity="0.75"
+            stroke="url(#ayeshaGoldGrad)"
+            strokeWidth="2.8"
+            strokeDasharray="6 3"
+          />
+          {/* Shimmering Gota Fringe Tassels */}
+          <path
+            d="M 482 464 C 504 516, 536 586, 572 668"
+            fill="none"
+            stroke="#fef08a"
+            strokeWidth="1.2"
+            strokeDasharray="2 3"
+            opacity="0.85"
           />
         </g>
 
         {/* ================================================================= */}
-        {/* 3. AYESHA NECK & EXPRESSIVE SCULPTED HEAD (Facing Left/Window)     */}
+        {/* 3. AYESHA NECK, SCULPTED HEAD & MINIMALIST MODERN GOLD JEWELRY     */}
         {/* ================================================================= */}
         <g
           id="ayesha-head-group"
           transform={`translate(538, 442) rotate(${-headPitch.toFixed(1)}) translate(-538, -442)`}
         >
-          {/* Graceful Neck Cylinder with Clavicle Shadow */}
+          {/* Graceful Neck Cylinder with Sternocleidomastoid & Clavicle Shading */}
           <path
-            d="M 522 412 L 520 462 C 528 474, 548 474, 556 462 L 554 412 Z"
+            d="M 522 412 L 520 464 C 528 476, 548 476, 556 464 L 554 412 Z"
             fill="url(#ayeshaLimbSkin)"
             stroke="#7d482a"
             strokeWidth="1.2"
           />
-          {/* Chin Cast Shadow on Neck */}
+          {/* Sternocleidomastoid Muscle Shadow & Throat Contour */}
           <path
-            d="M 522 418 C 530 430, 545 432, 554 422 L 554 412 L 522 412 Z"
+            d="M 526 422 C 532 442, 538 456, 542 466"
+            fill="none"
+            stroke="#8c5432"
+            strokeWidth="1.2"
+            opacity="0.45"
+            strokeLinecap="round"
+          />
+          {/* Supraclavicular Notch & Clavicle Bone Hollow */}
+          <path
+            d="M 534 466 Q 540 470 546 466"
+            fill="none"
+            stroke="#7d482a"
+            strokeWidth="1.2"
+            opacity="0.5"
+            strokeLinecap="round"
+          />
+          {/* Chin Cast Shadow on Upper Neck */}
+          <path
+            d="M 522 416 C 530 430, 546 432, 554 422 L 554 412 L 522 412 Z"
             fill="#5c3018"
-            opacity="0.38"
+            opacity="0.42"
           />
 
-          {/* Sculpted 3/4 Female Facial Cranium & Jawline (Facing Left toward Phone & Window) */}
+          {/* Minimalist Modern 18K Gold Collarbone Chain */}
+          <path
+            d="M 526 448 Q 538 462 550 448"
+            fill="none"
+            stroke="url(#ayeshaGoldGrad)"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+          {/* Floating Solitary Natural Drop Pearl Pendant */}
+          <ellipse cx="538" cy="458" rx="2.2" ry="3.2" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.6" />
+          <ellipse cx="537.4" cy="456.8" rx="0.8" ry="1.2" fill="#ffffff" opacity="0.9" />
+
+          {/* Sculpted 3/4 Female Facial Cranium & Refined Jawline */}
           <path
             d="M 502 336
                C 492 355, 490 382, 494 402
@@ -505,141 +749,288 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             strokeWidth="1.3"
           />
 
-          {/* Soft Rose Cheek Blush, Sunlit Cheekbone Highlight & Cool Blue/White Laptop Screen Key-Light Rim */}
-          <ellipse cx="512" cy="392" rx="14" ry="9" fill="url(#ayeshaCheekBlush)" />
-          <ellipse cx="508" cy="382" rx="8" ry="4" fill="#fff7ed" opacity="0.35" transform="rotate(-12 508 382)" />
+          {/* Soft Rose Cheek Blush & Cheekbone Highlight */}
+          <ellipse cx="512" cy="392" rx="15" ry="9" fill="url(#ayeshaCheekBlush)" />
+          <ellipse cx="508" cy="382" rx="8" ry="4" fill="#fff7ed" opacity="0.38" transform="rotate(-12 508 382)" />
+
+          {/* Cool Blue/White Laptop Screen Specular Key-Light Rim Along Jaw & Brow */}
           <path
             d="M 501 338 C 492 356, 490 384, 496 406 C 500 416, 511 425, 523 426"
             fill="none"
             stroke="#bae6fd"
             strokeWidth="1.8"
-            opacity="0.45"
+            opacity="0.55"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 498 368 L 493 390 L 498 402"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="0.8"
+            opacity="0.5"
             strokeLinecap="round"
           />
 
-          {/* Sculpted Nose Bridge & Tip (Facing Left) */}
+          {/* 3D Anatomical Sculpted Nose Bridge, Alar Cartilage & Nostril */}
+          {/* Nose Bridge Line */}
           <path
-            d="M 502 368 C 495 378, 488 386, 489 391 C 490 395, 497 396, 503 395"
+            d="M 502 366 C 496 376, 488 384, 489 391 C 490 395, 496 397, 504 395"
             fill="none"
             stroke="#8c502b"
-            strokeWidth="1.6"
+            strokeWidth="1.5"
             strokeLinecap="round"
           />
+          {/* Crisp Specular Dorsum Highlight */}
           <path
-            d="M 501 370 L 492 388"
+            d="M 501 368 L 491 387"
             fill="none"
-            stroke="#fff7ed"
+            stroke="#ffffff"
             strokeWidth="1.1"
-            opacity="0.6"
+            opacity="0.75"
+            strokeLinecap="round"
+          />
+          {/* Subtle Nostril Curve & Alar Base Shadow */}
+          <path
+            d="M 494 392 Q 498 395 502 393"
+            fill="none"
+            stroke="#451a03"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+          {/* Philtrum Dip Leading to Cupid's Bow */}
+          <path
+            d="M 496 398 L 496 404"
+            fill="none"
+            stroke="#a66843"
+            strokeWidth="0.9"
+            opacity="0.5"
             strokeLinecap="round"
           />
 
-          {/* Expressive Arched Eyebrows */}
+          {/* Expressive Feathered Arched Eyebrows with Micro-Hair Strokes */}
+          {/* Far Left Brow */}
           <path
-            d="M 493 360 Q 500 355 508 358"
+            d="M 492 360 Q 500 354 508 358"
             fill="none"
-            stroke="#1e110a"
+            stroke="#140b07"
             strokeWidth="2.4"
             strokeLinecap="round"
           />
+          <path d="M 493 361 L 495 358" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+          <path d="M 497 359 L 499 356" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+          <path d="M 502 358 L 504 356" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+
+          {/* Near Right Brow */}
           <path
-            d="M 516 359 Q 528 353 540 359"
+            d="M 515 359 Q 528 352 541 359"
             fill="none"
-            stroke="#1e110a"
+            stroke="#140b07"
             strokeWidth="2.6"
             strokeLinecap="round"
           />
+          <path d="M 517 360 L 519 356" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+          <path d="M 522 358 L 524 354" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+          <path d="M 528 356 L 531 353" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
+          <path d="M 534 356 L 537 355" stroke="#140b07" strokeWidth="0.9" strokeLinecap="round" />
 
-          {/* Eyes with Eyelashes, Dark Brown Iris & Dual Catchlights */}
+          {/* High-Fidelity Almond Eyes with Sclera, Limbal Ring, Pupil & Dual Catchlights */}
           <g className="animate-ayesha-blink">
             {/* Far Left Eye */}
-            <ellipse cx="500" cy="369" rx="5.5" ry="3.8" fill="#ffffff" stroke="#451a03" strokeWidth="0.9" />
-            <circle cx="499" cy="369" r="2.8" fill="#291307" />
-            <circle cx="499" cy="369" r="1.4" fill="#090504" />
-            <circle cx="497.8" cy="367.8" r="1" fill="#ffffff" />
-            <path d="M 493 368 Q 500 363 506 368" fill="none" stroke="#090504" strokeWidth="1.8" strokeLinecap="round" />
+            <ellipse cx="500" cy="369" rx="5.8" ry="4" fill="#ffffff" stroke="#451a03" strokeWidth="0.9" />
+            {/* Inner Canthus Tear Duct */}
+            <circle cx="505" cy="369.5" r="0.8" fill="#fda4af" />
+            {/* 3D Iris with Limbal Ring */}
+            <circle cx="499" cy="369" r="3" fill="url(#ayeshaIris3D)" stroke="#090504" strokeWidth="0.6" />
+            <circle cx="499" cy="369" r="1.4" fill="#000000" />
+            <circle cx="497.6" cy="367.6" r="1.1" fill="#ffffff" />
+            <path d="M 493 367 Q 500 362 506 367" fill="none" stroke="#090504" strokeWidth="1.9" strokeLinecap="round" />
+            {/* Lower Lash Accents */}
+            <path d="M 495 372 Q 499 373 504 371" fill="none" stroke="#451a03" strokeWidth="0.8" opacity="0.6" />
 
             {/* Near Right Eye */}
-            <ellipse cx="527" cy="369" rx="7.5" ry="4.5" fill="#ffffff" stroke="#451a03" strokeWidth="1" />
-            <circle cx="525" cy="369" r="3.6" fill="#3b1b0a" />
-            <circle cx="525" cy="369" r="1.8" fill="#090504" />
+            <ellipse cx="527" cy="369" rx="7.8" ry="4.8" fill="#ffffff" stroke="#451a03" strokeWidth="1" />
+            {/* Inner Canthus */}
+            <circle cx="520" cy="370" r="1" fill="#fda4af" />
+            {/* 3D Iris with Limbal Ring & Radial Striations */}
+            <circle cx="525" cy="369" r="3.8" fill="url(#ayeshaIris3D)" stroke="#090504" strokeWidth="0.7" />
+            <circle cx="525" cy="369" r="1.8" fill="#000000" />
             {/* Dual Specular Window Catchlights */}
-            <circle cx="523.5" cy="367.5" r="1.3" fill="#ffffff" />
-            <circle cx="526.8" cy="370.5" r="0.65" fill="#ffffff" opacity="0.85" />
-            {/* Upper Eyelash Wing */}
+            <circle cx="523.5" cy="367.2" r="1.4" fill="#ffffff" />
+            <circle cx="526.8" cy="370.4" r="0.75" fill="#ffffff" opacity="0.9" />
+            {/* Elegant Upper Eyelash Wing with Defined Liner */}
             <path
-              d="M 518 368 Q 527 362 537 367 L 540 365"
+              d="M 518 368 Q 527 361 538 366 L 542 364"
               fill="none"
               stroke="#090504"
-              strokeWidth="2.1"
+              strokeWidth="2.3"
               strokeLinecap="round"
             />
-            {/* Subtle Eyelid Crease */}
+            {/* Delicate Eyelid Crease */}
             <path
-              d="M 519 364 Q 527 360 535 364"
+              d="M 519 363 Q 527 359 536 363"
               fill="none"
               stroke="#7d482a"
               strokeWidth="0.9"
-              opacity="0.7"
+              opacity="0.75"
+            />
+            {/* Fine Lower Eyelashes */}
+            <path
+              d="M 522 373 Q 527 374 534 372"
+              fill="none"
+              stroke="#451a03"
+              strokeWidth="0.85"
+              opacity="0.65"
             />
           </g>
 
-          {/* Expressive Rose Lips (Gentle expectant expression, slight smile on notification) */}
+          {/* Sculpted Rose Lips with Cupid's Bow, Vermilion Border & Specular Gloss */}
           <path
             d={
               notificationActive
-                ? 'M 495 406 Q 504 404 514 405 Q 506 413 495 406 Z'
-                : 'M 495 407 Q 503 405 512 407 Q 504 411 495 407 Z'
+                ? 'M 494 406 Q 504 403 515 405 Q 506 414 494 406 Z'
+                : 'M 494 407 Q 503 404 513 406 Q 504 412 494 407 Z'
             }
             fill="#be123c"
             stroke="#881337"
             strokeWidth="0.8"
           />
+          {/* Vermilion Border Highlight on Cupid's Bow */}
           <path
-            d={notificationActive ? 'M 496 406 Q 504 409 514 404' : 'M 496 407 Q 503 408 512 407'}
+            d="M 495 406 Q 500 404 504 405 Q 508 404 513 406"
+            fill="none"
+            stroke="#fda4af"
+            strokeWidth="0.8"
+            opacity="0.85"
+          />
+          {/* Lower Lip Central Gloss Shine */}
+          <ellipse cx="504" cy="409.5" rx="3.5" ry="1.2" fill="#ffffff" opacity="0.45" />
+          {/* Lip Parting Line */}
+          <path
+            d={notificationActive ? 'M 495 406 Q 504 408 514 404' : 'M 495 407 Q 503 407 512 406'}
             fill="none"
             stroke="#4c0519"
             strokeWidth="1.1"
             strokeLinecap="round"
           />
-
-          {/* Right Ear & Gold Jhumka Earring */}
+          {/* Labiomental Groove (Under-Lip Shadow) */}
           <path
-            d="M 562 372 C 570 370, 574 382, 568 394 C 564 400, 558 398, 558 392"
+            d="M 499 414 Q 504 416 509 414"
+            fill="none"
+            stroke="#7d482a"
+            strokeWidth="0.9"
+            opacity="0.55"
+          />
+
+          {/* Sculpted Ear Anatomy with Helix, Tragus & Lobe */}
+          <path
+            d="M 560 370 C 570 368, 575 380, 569 394 C 565 400, 558 398, 557 390"
             fill="url(#ayeshaSkin3D)"
             stroke="#7d482a"
             strokeWidth="1.1"
           />
-          {/* Traditional Gold Stud & Hanging Jhumka Bell */}
-          <circle cx="562" cy="394" r="2.8" fill="#fbbf24" stroke="#92400e" strokeWidth="0.8" />
           <path
-            d="M 557 404 C 557 398, 567 398, 567 404 Z"
-            fill="#f59e0b"
-            stroke="#78350f"
-            strokeWidth="0.8"
+            d="M 563 374 C 567 375, 569 384, 564 390"
+            fill="none"
+            stroke="#a66843"
+            strokeWidth="0.9"
+            opacity="0.6"
           />
-          <circle cx="559" cy="406" r="1.1" fill="#fef08a" />
-          <circle cx="562" cy="407" r="1.1" fill="#fef08a" />
-          <circle cx="565" cy="406" r="1.1" fill="#fef08a" />
+          <circle cx="560" cy="382" r="1.2" fill="#a66843" opacity="0.5" />
 
-          {/* Swept Front Hair Crown & Side-Parted Bangs */}
+          {/* Minimalist Modern Jewelry: Sculpted 18K Gold Hoop Earring with Baroque Pearl Drop */}
+          {/* Gold Hoop Earring */}
+          <ellipse
+            cx="562"
+            cy="394"
+            rx="3.4"
+            ry="4.2"
+            fill="none"
+            stroke="url(#ayeshaGoldGrad)"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="561.4"
+            cy="393.2"
+            rx="1.5"
+            ry="2.2"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="0.6"
+            opacity="0.8"
+          />
+          {/* Dangling Baroque Freshwater Pearl */}
+          <ellipse
+            cx="562"
+            cy="402"
+            rx="2.2"
+            ry="3.2"
+            fill="url(#ayeshaPearlGrad)"
+            stroke="#b45309"
+            strokeWidth="0.6"
+          />
+          <ellipse cx="561.4" cy="400.8" rx="0.8" ry="1.2" fill="#ffffff" opacity="0.9" />
+
+          {/* Multi-Layered Flowing Hair: Crown Volume, Side-Parted Bangs & Loose Temple Wisps */}
+          {/* Main Crown Volume */}
           <path
             d="M 494 352
-               C 496 326, 522 312, 554 318
-               C 582 324, 596 352, 592 392
-               C 588 424, 576 452, 568 468
-               C 566 435, 572 396, 564 372
-               C 556 352, 535 344, 514 342
+               C 496 324, 522 310, 554 316
+               C 584 322, 598 350, 594 392
+               C 590 424, 578 452, 570 468
+               C 567 435, 573 396, 565 372
+               C 557 352, 536 344, 514 342
                C 504 342, 498 346, 494 352 Z"
             fill="url(#ayeshaHairGrad)"
           />
-          {/* Warm Window Sunlight Specular Hair Highlight */}
+          {/* Distinct Hair Parting & Strand Contour Lines */}
           <path
-            d="M 508 330 C 528 322, 555 326, 572 342"
+            d="M 526 314 C 532 328, 536 340, 538 350"
             fill="none"
-            stroke="#a16207"
-            strokeWidth="2.5"
-            opacity="0.45"
+            stroke="#090504"
+            strokeWidth="1.4"
+            opacity="0.85"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 548 320 C 560 334, 570 354, 574 374"
+            fill="none"
+            stroke="#23140d"
+            strokeWidth="1.2"
+            opacity="0.7"
+            strokeLinecap="round"
+          />
+
+          {/* Loose Temple Wisps & Soft Curls Framing the Face */}
+          <path
+            d="M 494 350 C 490 358, 491 366, 493 372 Q 494 370 496 364"
+            fill="none"
+            stroke="#140b07"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 556 384 C 554 394, 552 404, 556 414 Q 557 410 557 400"
+            fill="none"
+            stroke="#140b07"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+
+          {/* Luminous Warm Morning Window Sunlight Rim Highlighting Crown & Shoulder */}
+          <path
+            d="M 508 328 C 530 318, 560 322, 578 340"
+            fill="none"
+            stroke="url(#ayeshaSunlightRim)"
+            strokeWidth="3.2"
+            opacity="0.85"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 564 348 C 582 368, 592 396, 588 432"
+            fill="none"
+            stroke="url(#ayeshaSunlightRim)"
+            strokeWidth="2.2"
+            opacity="0.75"
             strokeLinecap="round"
           />
         </g>
@@ -778,275 +1169,260 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
           <ellipse cx="488" cy="669" rx="46" ry="9" fill="#090300" opacity="0.52" />
 
           {/* --------------------------------------------------------------- */}
-          {/* PROP A: 16″ CNC UNIBODY WORKSTATION (PATH-TRACED REAR-LID VIEW) */}
-          {/* Widescreen 16:10 dimensions, ray-traced contact umbra & soft     */}
-          {/* cast penumbra, solid unibody base with left I/O profile wall,    */}
-          {/* active screen area-light spill, and the official Rasai emblem.   */}
+          {/* PROP A: 16″ CNC UNIBODY WORKSTATION (ERGONOMIC VIEW FACING AYESHA) */}
+          {/* Display screen and backlit chiclet keyboard deck oriented toward */}
+          {/* Ayesha on the right, with I/O array facing camera and screen    */}
+          {/* area light spilling across the walnut table to Ayesha's hands.   */}
           {/* --------------------------------------------------------------- */}
-          <g id="table-laptop" transform="translate(64, 526)">
-            {/* 1. PATH-TRACED DIRECTIONAL CAST SHADOW ON WALNUT TABLE (PENUMBRA) */}
-            {/* Soft optical shadow cast down-right by the tall 16″ lid under window sunlight */}
+          <g id="table-laptop" transform="translate(64, 526)" role="img" aria-label="16″ CNC Unibody Workstation facing Ayesha">
+            {/* 1. DIRECTIONAL CAST SHADOW (PENUMBRA UNDER ROOM SUNLIGHT) */}
             <polygon
-              points="48,168 115,178 285,166 260,146 204,136"
+              points="54,126 195,119 265,130 180,146 54,136"
               fill="url(#laptopCastShadowGrad)"
               filter="url(#laptopCastShadowFilter)"
             />
 
             {/* 2. CONTACT AMBIENT OCCLUSION SHADOW DIRECTLY UNDER CHASSIS (UMBRA) */}
             <polygon
-              points="26,149 206,134 228,158 50,174"
+              points="52,132 210,123 242,156 70,169"
               fill="#090300"
               opacity="0.88"
               filter="url(#laptopContactShadowFilter)"
             />
 
-            {/* 4 Precision Elastomeric Anti-Slip Rubber Feet Anchoring Base to Table */}
-            <ellipse cx="36" cy="149" rx="5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
-            <ellipse cx="202" cy="136" rx="5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
-            <ellipse cx="56" cy="172" rx="5.5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
-            <ellipse cx="220" cy="157" rx="5.5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
+            {/* 4 Precision Elastomeric Anti-Slip Rubber Feet Anchoring Base */}
+            <ellipse cx="58" cy="130" rx="4.5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.12)" strokeWidth="0.3" />
+            <ellipse cx="206" cy="122" rx="4.5" ry="1.8" fill="#08090c" stroke="rgba(255,255,255,0.12)" strokeWidth="0.3" />
+            <ellipse cx="76" cy="164" rx="5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.12)" strokeWidth="0.3" />
+            <ellipse cx="230" cy="151" rx="5" ry="2" fill="#08090c" stroke="rgba(255,255,255,0.12)" strokeWidth="0.3" />
 
             {/* 3. RAY-TRACED SCREEN AREA LIGHT (EMISSION SPILL TOWARD AYESHA) */}
-            {/* Soft cyan light cone emitted from active display facing inward across table */}
             <polygon
-              points="208,132 212,36 320,105 340,175 190,165"
+              points="198,114 206,36 340,95 365,160 215,148"
               fill="url(#screenAreaLightSpill)"
-            />
-
-            {/* 4. SOLID UNIBODY LOWER BASE CHASSIS (6063-T6 ANODIZED ALLOY) */}
-            {/* Top Deck Surface Visible Forward of the Hinge Line */}
-            <polygon
-              points="28,146 208,132 226,156 52,172"
-              fill="#18191d"
-              stroke="rgba(255,255,255,0.14)"
-              strokeWidth="0.5"
-            />
-            {/* Soft Keyboard Well / Trackpad Subtle Specular Outline */}
-            <polygon
-              points="78,160 196,149 190,140 74,151"
-              fill="#0c0d11"
               opacity="0.75"
             />
 
-            {/* Front Lip Wall (Facing Forward with Ergonomic Thumb Notch) */}
+            {/* 4. SOLID UNIBODY LOWER BASE CHASSIS (6063-T6 ANODIZED ALLOY) */}
+            {/* Top Deck Surface (Angled toward Ayesha, keyboard well & palm rest) */}
             <polygon
-              points="52,172 226,156 226,162 52,178"
+              points="54,126 212,118 236,148 72,160"
+              fill="#14151a"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="0.6"
+            />
+
+            {/* Front Lip Wall (Ergonomic edge facing front-left) */}
+            <polygon
+              points="72,160 236,148 236,155 72,167"
               fill="url(#aeroProEdgeWall)"
-              stroke="rgba(255,255,255,0.16)"
+              stroke="rgba(255,255,255,0.18)"
               strokeWidth="0.5"
             />
+            {/* Diamond-Cut Specular Chamfer Along Front Lip */}
+            <line x1="72" y1="160" x2="236" y2="148" stroke="rgba(255,255,255,0.45)" strokeWidth="0.75" />
+
             {/* CNC Milled Thumb Groove Centered on Front Lip */}
             <polygon
-              points="126,164.5 152,162.5 152,165 126,167"
-              fill="#0a0b0e"
+              points="144,155 168,153 168,155.5 144,157.5"
+              fill="#090a0d"
               stroke="rgba(255,255,255,0.22)"
               strokeWidth="0.4"
             />
 
-            {/* Left Profile Side Wall (Facing Viewer/Left with Full I/O Array) */}
+            {/* Left Profile Side Wall (Facing Viewer with I/O Array) */}
             <polygon
-              points="28,146 52,172 52,178 28,153"
+              points="54,126 72,160 72,167 54,133"
               fill="url(#aeroProEdgeWall)"
               stroke="rgba(255,255,255,0.2)"
               strokeWidth="0.6"
             />
             {/* Diamond-Cut Specular Chamfer Along Top Left Wall Edge */}
-            <line x1="28" y1="146" x2="52" y2="172" stroke="rgba(255,255,255,0.45)" strokeWidth="0.75" />
+            <line x1="54" y1="126" x2="72" y2="160" stroke="rgba(255,255,255,0.4)" strokeWidth="0.7" />
 
             {/* MagSafe 3 Fast-Charge Port with Amber Status LED */}
-            <polygon points="32,150 37,155.5 37,158 32,152.5" fill="#07080a" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
-            <circle cx="34.5" cy="154.5" r="0.8" fill="#fbbf24" style={{ filter: 'drop-shadow(0 0 2px #fbbf24)' }} />
+            <polygon points="57,132 61,139 61,141.5 57,134.5" fill="#07080a" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <circle cx="59" cy="136.5" r="0.7" fill="#fbbf24" style={{ filter: 'drop-shadow(0 0 2px #fbbf24)' }} />
 
             {/* Dual Thunderbolt 4 / USB-C 40Gb/s Receptacles with Grounding Collars */}
-            <polygon points="39,158 42,161 42,163.5 39,160.5" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
-            <line x1="40" y1="159.5" x2="41" y2="160.5" stroke="#94a3b8" strokeWidth="0.4" />
-            <polygon points="44,163.5 47,166.5 47,169 44,166" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
-            <line x1="45" y1="165" x2="46" y2="166" stroke="#94a3b8" strokeWidth="0.4" />
+            <polygon points="62,142 65,147 65,149.5 62,144.5" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <line x1="63.5" y1="144.5" x2="64.5" y2="146" stroke="#94a3b8" strokeWidth="0.4" />
+            <polygon points="66,149 69,154 69,156.5 66,151.5" fill="#050608" stroke="rgba(255,255,255,0.3)" strokeWidth="0.35" />
+            <line x1="67.5" y1="151.5" x2="68.5" y2="153" stroke="#94a3b8" strokeWidth="0.4" />
 
             {/* 3.5mm High-Impedance Pro Audio Jack with Gold Contact Ring */}
-            <ellipse cx="49" cy="172.5" rx="1.1" ry="0.9" fill="#040507" stroke="#fbbf24" strokeWidth="0.3" />
+            <ellipse cx="70.5" cy="159" rx="0.9" ry="0.8" fill="#040507" stroke="#fbbf24" strokeWidth="0.3" />
 
-            {/* Rear Spine Wall (Under Hinge Line) */}
+            {/* Right Profile Side Wall (Facing Ayesha / Table Depth) */}
             <polygon
-              points="28,146 208,132 208,138 28,153"
-              fill="#141519"
-              stroke="rgba(255,255,255,0.14)"
+              points="212,118 236,148 236,155 212,125"
+              fill="#0d0e12"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="0.4"
+            />
+
+            {/* 5. KEYBOARD DECK & TRACKPAD (ORIENTED FACING AYESHA) */}
+            {/* Frosted Glass Force Touch Trackpad (Closest to Ayesha's hands on right palm rest) */}
+            <polygon
+              points="168,136 216,133 224,146 174,149"
+              fill="#181920"
+              stroke="rgba(255,255,255,0.28)"
               strokeWidth="0.5"
             />
-            {/* Specular Bottom Lip Along Lower Chassis Base */}
-            <line x1="28" y1="153" x2="208" y2="138" stroke="rgba(255,255,255,0.3)" strokeWidth="0.6" />
+            {/* Trackpad Subtle Haptic Center Line */}
+            <line x1="195" y1="134" x2="199" y2="148" stroke="rgba(255,255,255,0.08)" strokeWidth="0.4" />
 
-            {/* Precision Thermal Exhaust Louvers Tucked Under Hinge */}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <line
-                key={`ex-l-${i}`}
-                x1={38 + i * 2.8}
-                y1={148 - i * 0.22}
-                x2={38 + i * 2.8}
-                y2={151 - i * 0.22}
-                stroke="#07080a"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-              />
-            ))}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <line
-                key={`ex-r-${i}`}
-                x1={162 + i * 2.8}
-                y1={138.5 - i * 0.22}
-                x2={162 + i * 2.8}
-                y2={141.5 - i * 0.22}
-                stroke="#07080a"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-              />
-            ))}
-
-            {/* Central Cylindrical Barrel Clutch Hinge Barrel */}
-            <rect
-              x="76"
-              y="137"
-              width="82"
-              height="6"
-              rx="2.5"
-              fill="url(#aeroProHingeGrad)"
-              stroke="rgba(255,255,255,0.2)"
-              strokeWidth="0.6"
-              transform="rotate(-4.5 76 137)"
-            />
-            <rect
-              x="77"
-              y="137"
-              width="8"
-              height="6"
-              rx="1.2"
-              fill="#242730"
-              stroke="rgba(255,255,255,0.25)"
-              strokeWidth="0.5"
-              transform="rotate(-4.5 77 137)"
-            />
-            <rect
-              x="149"
-              y="137"
-              width="8"
-              height="6"
-              rx="1.2"
-              fill="#242730"
-              stroke="rgba(255,255,255,0.25)"
-              strokeWidth="0.5"
-              transform="rotate(-4.5 77 137)"
-            />
-
-            {/* 5. 16″ CNC UNIBODY DISPLAY LID (TRUE 16:10 PERSPECTIVE PROPORTIONS) */}
-            {/* Active Retina Screen Glowing Rim (Facing Inward to Ayesha) */}
+            {/* Recessed Keyboard Well Inset into Top Chassis */}
             <polygon
-              points="210,36 213,36 209,132 206,132"
-              fill="#38bdf8"
-              opacity="0.9"
-              style={{ filter: 'drop-shadow(1px 0 3px #38bdf8)' }}
-            />
-            <line x1="211.5" y1="36" x2="207.5" y2="132" stroke="#e0f2fe" strokeWidth="1.2" strokeLinecap="round" />
-
-            {/* 3D Top Diamond-Cut Chamfer Bevel Lip */}
-            <polygon
-              points="41,47 212,35 212,37 42,49"
-              fill="#f8fafc"
-              opacity="0.85"
-              stroke="rgba(255,255,255,0.4)"
+              points="68,130 196,123 206,138 76,146"
+              fill="#0a0b0e"
+              stroke="rgba(255,255,255,0.15)"
               strokeWidth="0.5"
             />
-            {/* 3D Left Profile Edge Lip */}
+            {/* Soft Ambient Backlight Glow Well Underneath Keys */}
             <polygon
-              points="41,47 43,49 29,147 27,145"
-              fill="#383d47"
-              stroke="rgba(255,255,255,0.25)"
-              strokeWidth="0.5"
-            />
-
-            {/* Main Space Black Anodized Back Lid Surface */}
-            <polygon
-              points="42,48 212,36 208,132 28,146"
-              fill="url(#aeroProLidGrad)"
-              stroke="#2b2f38"
-              strokeWidth="1.2"
-            />
-
-            {/* Path-Traced Anisotropic Sunlight / Window Glare Sweep Across Back Lid */}
-            <polygon
-              points="58,47 114,43 148,136 92,141"
-              fill="#ffffff"
-              opacity="0.14"
-            />
-            <polygon
-              points="126,42 152,40 184,134 158,136"
+              points="69,131 195,124 205,137 77,145"
               fill="#38bdf8"
               opacity="0.08"
             />
 
-            {/* 0.8mm Diamond Chamfer Specular Inner Hairline */}
+            {/* 5 Rows of Backlit Chiclet Keycaps Facing Ayesha */}
+            {/* Row 1: Function / Esc Row */}
+            <line x1="71" y1="132" x2="194" y2="125" stroke="#1f2129" strokeWidth="1.2" strokeLinecap="round" />
+            <line x1="71" y1="132" x2="194" y2="125" stroke="rgba(255,255,255,0.25)" strokeWidth="0.4" strokeDasharray="3 1.5" />
+
+            {/* Row 2: Numbers Row */}
+            <line x1="72.5" y1="134.5" x2="196" y2="127.5" stroke="#1f2129" strokeWidth="1.3" strokeLinecap="round" />
+            <line x1="72.5" y1="134.5" x2="196" y2="127.5" stroke="rgba(255,255,255,0.3)" strokeWidth="0.4" strokeDasharray="4 1.5" />
+
+            {/* Row 3: QWERTY Row */}
+            <line x1="74" y1="137" x2="198" y2="130" stroke="#1f2129" strokeWidth="1.4" strokeLinecap="round" />
+            <line x1="74" y1="137" x2="198" y2="130" stroke="rgba(255,255,255,0.32)" strokeWidth="0.4" strokeDasharray="4.2 1.5" />
+
+            {/* Row 4: Home Row (ASDF) */}
+            <line x1="75.5" y1="139.8" x2="200" y2="132.8" stroke="#1f2129" strokeWidth="1.4" strokeLinecap="round" />
+            <line x1="75.5" y1="139.8" x2="200" y2="132.8" stroke="rgba(255,255,255,0.35)" strokeWidth="0.4" strokeDasharray="4.5 1.5" />
+
+            {/* Row 5: Bottom Row with Spacebar Centered Toward Ayesha */}
+            <line x1="77" y1="142.8" x2="116" y2="140.8" stroke="#1f2129" strokeWidth="1.5" strokeLinecap="round" />
+            {/* Ergonomic Wide Spacebar */}
             <polygon
-              points="43.5,49.5 210.5,37.8 206.5,130.5 30,144.5"
+              points="120,141.2 164,139 165,142 121,144.2"
+              fill="#252833"
+              stroke="rgba(255,255,255,0.28)"
+              strokeWidth="0.4"
+            />
+            <line x1="168" y1="138.8" x2="203" y2="137" stroke="#1f2129" strokeWidth="1.5" strokeLinecap="round" />
+
+            {/* Backlight Glow Bleed Between Key Rows */}
+            <line x1="71" y1="133.2" x2="195" y2="126.2" stroke="#38bdf8" strokeWidth="0.25" opacity="0.4" />
+            <line x1="73" y1="135.8" x2="197" y2="128.8" stroke="#38bdf8" strokeWidth="0.25" opacity="0.4" />
+            <line x1="75" y1="138.4" x2="199" y2="131.4" stroke="#38bdf8" strokeWidth="0.25" opacity="0.4" />
+            <line x1="77" y1="141.2" x2="202" y2="134.2" stroke="#38bdf8" strokeWidth="0.25" opacity="0.4" />
+
+            {/* 6. CENTRAL CYLINDRICAL BARREL CLUTCH HINGE */}
+            <rect
+              x="62"
+              y="123"
+              width="136"
+              height="5"
+              rx="2"
+              fill="url(#aeroProHingeGrad)"
+              stroke="rgba(255,255,255,0.2)"
+              strokeWidth="0.5"
+              transform="rotate(-2.8 62 123)"
+            />
+
+            {/* 7. 16″ CNC UNIBODY DISPLAY LID (OPENING TOWARD AYESHA) */}
+            {/* Outer Display Lid Frame */}
+            <polygon
+              points="60,42 210,32 202,119 54,126"
+              fill="#14161c"
+              stroke="#282a32"
+              strokeWidth="1"
+            />
+
+            {/* 3D Top Diamond-Cut Chamfer Bevel Lip */}
+            <line x1="60" y1="42" x2="210" y2="32" stroke="#ffffff" strokeWidth="0.8" opacity="0.85" />
+            {/* 3D Left Profile Edge Lip */}
+            <line x1="54" y1="126" x2="60" y2="42" stroke="#ffffff" strokeWidth="0.7" opacity="0.5" />
+
+            {/* Active Retina Display (Facing Inward to Ayesha) */}
+            <polygon
+              points="64,46 206,36 198,114 58,121"
+              fill="#060911"
+              stroke="#1e293b"
+              strokeWidth="0.6"
+            />
+            {/* Inner Bezel Accent Glow */}
+            <polygon
+              points="65,47 205,37 197,113 59,120"
               fill="none"
-              stroke="rgba(255, 255, 255, 0.38)"
-              strokeWidth="0.7"
+              stroke="#38bdf8"
+              strokeWidth="0.5"
+              opacity="0.35"
             />
 
-            {/* Rear Spine Hinge Seam & Micro-Milled Antenna Line */}
-            <line
-              x1="38"
-              y1="142"
-              x2="198"
-              y2="129"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="0.75"
-              strokeDasharray="14 3 60 3 14"
-            />
+            {/* ACTIVE DISPLAY UI: RASAI NDR RESOLUTION CONSOLE (FACING AYESHA) */}
+            {/* Title Bar & Window Management Dots */}
+            <g id="laptop-screen-ui">
+              {/* Traffic Light Dots */}
+              <circle cx="69" cy="49" r="1.1" fill="#ef4444" />
+              <circle cx="73" cy="48.7" r="1.1" fill="#f59e0b" />
+              <circle cx="77" cy="48.4" r="1.1" fill="#10b981" />
+              <text x="84" y="50" fill="#94a3b8" fontSize="3.2" fontFamily="monospace" transform="rotate(-3.8 84 50)">RASAI // LAHORE GATEWAY</text>
+              <line x1="65" y1="52.5" x2="204" y2="43.2" stroke="#334155" strokeWidth="0.5" />
 
-            {/* Left & Right Hinge Clutch Cutout Notches */}
-            <polygon points="52,141 64,140 64,143 52,144" fill="#090a0d" stroke="rgba(255,255,255,0.18)" strokeWidth="0.4" />
-            <polygon points="172,131.5 184,130.5 184,133.5 172,134.5" fill="#090a0d" stroke="rgba(255,255,255,0.18)" strokeWidth="0.4" />
+              {/* Left Navigation Sidebar */}
+              <polygon points="65,53 92,51.2 89,112 60,119" fill="#0b1120" opacity="0.8" />
+              <line x1="68" y1="57.5" x2="86" y2="56.2" stroke="#38bdf8" strokeWidth="0.9" />
+              <line x1="68" y1="62" x2="83" y2="61" stroke="#64748b" strokeWidth="0.8" />
+              <line x1="68" y1="66.5" x2="85" y2="65.5" stroke="#64748b" strokeWidth="0.8" />
+              <line x1="67" y1="71" x2="82" y2="70" stroke="#64748b" strokeWidth="0.8" />
+              <line x1="67" y1="75.5" x2="84" y2="74.5" stroke="#64748b" strokeWidth="0.8" />
 
-            {/* ------------------------------------------------------------- */}
-            {/* OFFICIAL RASAI EMBLEM CENTERED ON BACK LID (NO OTHER TEXT)    */}
-            {/* ------------------------------------------------------------- */}
-            <g transform="translate(122, 90)">
-              {/* Subtle Specular Aura around Recessed Pocket */}
-              <ellipse cx="0" cy="0" rx="16" ry="14" fill="#38bdf8" opacity="0.12" style={{ filter: 'blur(3px)' }} />
-              {/* 0.4mm Recessed CNC Pocket Bezel Ring */}
-              <ellipse
-                cx="0"
-                cy="0"
-                rx="15"
-                ry="13.5"
-                fill="#090a0d"
-                stroke="rgba(255,255,255,0.22)"
-                strokeWidth="0.75"
-                transform="rotate(-4.2) skewX(7)"
-              />
+              {/* Metric Card 1: Dispatch Status */}
+              <polygon points="96,56 148,52.5 146,69.5 94,73" fill="#0f172a" stroke="#1e293b" strokeWidth="0.4" />
+              <polygon points="99,59 124,57.2 123,62.2 98,64" fill="#0284c7" opacity="0.6" />
+              <text x="101" y="62" fill="#ffffff" fontSize="2.6" fontFamily="monospace" transform="rotate(-3.8 101 62)">DISPATCH #9042</text>
+              {/* Telemetry Pulse Line */}
+              <polyline points="98,69 108,66.5 114,70 122,65.5 130,68 138,63.5 144,65.5" fill="none" stroke="#22d3ee" strokeWidth="0.8" />
 
-              {/* Exact Scaled & Perspective-Aligned Rasai Geometric Emblem */}
-              <g transform="rotate(-4.2) skewX(7) scale(0.026) translate(-668, -337)">
-                <path d={LOGO_PATHS.bodyOuter.d} fill="url(#rasaiLidChromeOuter)" />
-                {LOGO_PATHS.bodyOuter.bevels.map((b, i) => (
-                  <path key={`lid-bo-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
-                ))}
+              {/* Metric Card 2: Ayesha Khan Gulberg Destination */}
+              <polygon points="152,52 196,49 194,66 150,69" fill="#0f172a" stroke="#1e293b" strokeWidth="0.4" />
+              <text x="155" y="56" fill="#38bdf8" fontSize="2.6" fontFamily="monospace" transform="rotate(-3.8 155 56)">AYESHA KHAN</text>
+              <text x="155" y="60.5" fill="#94a3b8" fontSize="2.1" fontFamily="monospace" transform="rotate(-3.8 155 60.5)">GULBERG III // LAHORE</text>
+              <text x="155" y="65" fill="#34d399" fontSize="2.4" fontFamily="monospace" transform="rotate(-3.8 155 65)">Rs. 4,500 COD</text>
 
-                <path d={LOGO_PATHS.bodyInner.d} fill="url(#rasaiLidChromeInner)" />
-
-                <path d={LOGO_PATHS.bodyLower.d} fill="url(#rasaiLidChromeLower)" />
-                {LOGO_PATHS.bodyLower.bevels.map((b, i) => (
-                  <path key={`lid-bl-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
-                ))}
-
-                <path d={LOGO_PATHS.arrow.d} fill="url(#rasaiLidChromeArrow)" />
-                {LOGO_PATHS.arrow.bevels.map((b, i) => (
-                  <path key={`lid-ar-${i}`} d={b.d} fill={b.fill} opacity={0.8} />
-                ))}
-              </g>
-
-              {/* Path-Traced Specular Glint Across Chrome Emblem */}
-              <line x1="-8" y1="-4" x2="8" y2="10" stroke="#ffffff" strokeWidth="0.65" opacity="0.75" transform="rotate(-4.2)" />
+              {/* Lower Telemetry Log Area */}
+              <polygon points="94,76 196,69.2 192,110 90,117" fill="#070b14" stroke="#1e293b" strokeWidth="0.4" />
+              <line x1="96" y1="82" x2="175" y2="76.5" stroke="#38bdf8" strokeWidth="0.7" opacity="0.8" />
+              <line x1="96" y1="86" x2="160" y2="81.5" stroke="#22c55e" strokeWidth="0.7" opacity="0.8" />
+              <line x1="95" y1="90" x2="182" y2="84" stroke="#94a3b8" strokeWidth="0.6" opacity="0.6" />
+              <line x1="95" y1="94" x2="150" y2="90" stroke="#64748b" strokeWidth="0.6" opacity="0.6" />
+              <line x1="94" y1="98" x2="170" y2="92.5" stroke="#38bdf8" strokeWidth="0.6" opacity="0.7" />
+              {/* Cyan Blinking Terminal Cursor */}
+              <rect x="94" y="102" width="2.8" height="4" fill="#22d3ee" transform="rotate(-3.8 94 102)" />
             </g>
+
+            {/* Diagonal Screen Glass Specular Reflection */}
+            <polygon
+              points="105,43 145,40 180,115 140,118"
+              fill="#ffffff"
+              opacity="0.06"
+            />
+            {/* Screen Glass Inner Hairline */}
+            <polygon
+              points="64.5,46.5 205.5,36.5 197.5,113.5 58.5,120.5"
+              fill="none"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="0.4"
+            />
+
+            {/* WebCam Notch / Sensor Dot at Top Bezel Center */}
+            <polygon points="132,38 142,37.3 142,39.5 132,40.2" fill="#000000" />
+            <circle cx="137" cy="38.7" r="0.6" fill="#1e293b" stroke="#38bdf8" strokeWidth="0.2" />
+            <circle cx="140" cy="38.5" r="0.3" fill="#22c55e" />
           </g>
 
           {/* --------------------------------------------------------------- */}
@@ -1490,41 +1866,156 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
           id="ayesha-right-arm"
           transform={`translate(585, 488) rotate(${armReachDeg.toFixed(1)}) translate(-585, -488)`}
         >
-          {/* Right Shoulder & Embroidered Sleeve */}
+          {/* Right Shoulder & Anatomical Lawn Kurta Sleeve */}
           <path
-            d="M 562 472 C 594 476, 616 518, 608 578 L 564 584 C 566 535, 558 500, 548 482 Z"
+            d="M 562 472 C 596 476, 618 518, 610 578 L 564 584 C 566 534, 558 498, 548 482 Z"
             fill="url(#ayeshaKurtaGrad)"
             stroke="#042f2e"
             strokeWidth="1.6"
           />
-          {/* Gold Cuff Trim */}
+          {/* Sleeve Fabric Drape & Tension Creases */}
           <path
-            d="M 562 576 L 609 572 L 607 586 L 560 590 Z"
-            fill="#0f766e"
-            stroke="#fbbf24"
-            strokeWidth="1.4"
+            d="M 584 496 C 594 522, 598 550, 596 576"
+            fill="none"
+            stroke="#042f2e"
+            strokeWidth="1.6"
+            opacity="0.5"
+            strokeLinecap="round"
           />
-          {/* Forearm & Hand Reaching Toward Table / Phone */}
           <path
-            d="M 565 586 C 554 618, 530 642, 496 650 L 504 668 C 546 662, 584 635, 604 584 Z"
+            d="M 570 538 C 582 546, 595 548, 606 540"
+            fill="none"
+            stroke="#2dd4bf"
+            strokeWidth="1.1"
+            opacity="0.3"
+            strokeLinecap="round"
+          />
+
+          {/* Scalloped Organza Lace Sleeve Cuff with Gold Zari Border */}
+          <path
+            d="M 560 574 L 610 570 L 608 588 L 558 592 Z"
+            fill="url(#ayeshaOrganzaLace)"
+            stroke="#0d9488"
+            strokeWidth="1"
+          />
+          <path
+            d="M 560 574 L 610 570"
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth="1.6"
+            strokeDasharray="4 2"
+          />
+          {/* Lace Cutwork Eyelets on Right Cuff */}
+          <circle cx="568" cy="582" r="1.2" fill="#ffffff" opacity="0.8" />
+          <circle cx="578" cy="580" r="1.2" fill="#ffffff" opacity="0.8" />
+          <circle cx="588" cy="578" r="1.2" fill="#ffffff" opacity="0.8" />
+          <circle cx="598" cy="576" r="1.2" fill="#ffffff" opacity="0.8" />
+
+          {/* Forearm & Wrist Reaching Toward Table / Phone */}
+          <path
+            d="M 564 586 C 554 618, 528 642, 496 650 L 504 668 C 546 662, 582 635, 604 584 Z"
             fill="url(#ayeshaLimbSkin)"
             stroke="#7d482a"
             strokeWidth="1.2"
           />
-          {/* Gold Ladies Wristwatch */}
-          <g transform="translate(524, 638) rotate(-25)">
-            <rect x="-4" y="-9" width="8" height="18" rx="1.5" fill="#d97706" stroke="#78350f" strokeWidth="0.8" />
-            <circle cx="0" cy="0" r="6" fill="#fef3c7" stroke="#b45309" strokeWidth="1.2" />
-            <line x1="0" y1="0" x2="2" y2="-3" stroke="#78350f" strokeWidth="1" />
-            <line x1="0" y1="0" x2="-3" y2="1" stroke="#78350f" strokeWidth="1" />
-          </g>
-          {/* Right Hand & Sculpted Fingers */}
+          {/* Forearm Muscle & Tendon Shading */}
           <path
-            d="M 496 650 C 476 650, 458 656, 452 664 C 450 670, 464 674, 484 671 L 506 668 Z"
+            d="M 552 602 C 538 624, 520 638, 502 646"
+            fill="none"
+            stroke="#a66843"
+            strokeWidth="1.2"
+            opacity="0.45"
+            strokeLinecap="round"
+          />
+
+          {/* Sleek Minimalist Modern 18K Gold Wristwatch */}
+          <g transform="translate(524, 638) rotate(-25)">
+            {/* Segmented Gold Link Bracelet */}
+            <path
+              d="M -5 -11 L 5 -11 L 5 11 L -5 11 Z"
+              fill="url(#ayeshaGoldGrad)"
+              stroke="#78350f"
+              strokeWidth="0.8"
+            />
+            <line x1="-5" y1="-5" x2="5" y2="-5" stroke="#78350f" strokeWidth="0.8" />
+            <line x1="-5" y1="5" x2="5" y2="5" stroke="#78350f" strokeWidth="0.8" />
+            {/* Ultra-Slim Gold Watch Bezel */}
+            <circle cx="0" cy="0" r="6.8" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.9" />
+            {/* Luminous Mother-of-Pearl Dial */}
+            <circle cx="0" cy="0" r="5.2" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.6" />
+            {/* Dial Hour Markers & Polished Hands */}
+            <circle cx="0" cy="-3.6" r="0.6" fill="#78350f" />
+            <circle cx="3.6" cy="0" r="0.6" fill="#78350f" />
+            <circle cx="0" cy="3.6" r="0.6" fill="#78350f" />
+            <circle cx="-3.6" cy="0" r="0.6" fill="#78350f" />
+            <line x1="0" y1="0" x2="2.2" y2="-2.6" stroke="#451a03" strokeWidth="1" strokeLinecap="round" />
+            <line x1="0" y1="0" x2="-2.6" y2="0.8" stroke="#451a03" strokeWidth="1" strokeLinecap="round" />
+            <circle cx="0" cy="0" r="0.8" fill="#d97706" />
+          </g>
+
+          {/* Fully Articulated Sculpted Right Hand & Extended Fingers */}
+          {/* Palm Base & Thenar Eminence */}
+          <path
+            d="M 504 650 C 494 650, 482 652, 474 654 C 470 658, 478 664, 492 664 L 506 662 Z"
             fill="url(#ayeshaSkin3D)"
             stroke="#7d482a"
             strokeWidth="1.1"
           />
+
+          {/* Opposable Thumb Reaching Forward */}
+          <path
+            d="M 488 648 C 478 646, 466 648, 456 652 C 454 654, 456 657, 460 657 C 470 655, 480 653, 492 652 Z"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="1"
+          />
+          <ellipse cx="458" cy="654.2" rx="2.4" ry="1.2" fill="url(#ayeshaNailGrad)" />
+          <ellipse cx="457.4" cy="653.8" rx="1.1" ry="0.6" fill="#ffffff" opacity="0.7" />
+
+          {/* Index Finger (Reaching toward table phone) */}
+          <path
+            d="M 494 652 C 478 652, 460 654, 442 657 C 438 658, 439 662, 444 662 C 460 660, 478 658, 496 657 Z"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="1"
+          />
+          <ellipse cx="443" cy="659.5" rx="2.5" ry="1.2" fill="url(#ayeshaNailGrad)" />
+          <ellipse cx="442.4" cy="659" rx="1.2" ry="0.6" fill="#ffffff" opacity="0.7" />
+
+          {/* Middle Finger (Longest reach toward table phone) */}
+          <path
+            d="M 496 657 C 478 658, 458 660, 438 663 C 434 664, 435 668, 440 668 C 458 666, 478 664, 498 662 Z"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="1"
+          />
+          <ellipse cx="439.5" cy="665.5" rx="2.5" ry="1.2" fill="url(#ayeshaNailGrad)" />
+          <ellipse cx="439" cy="665" rx="1.2" ry="0.6" fill="#ffffff" opacity="0.7" />
+
+          {/* Ring Finger with Minimalist Modern Solitary 18K Gold Band Ring */}
+          <path
+            d="M 498 662 C 480 664, 462 666, 445 669 C 442 670, 443 673, 448 673 C 464 671, 480 669, 500 667 Z"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="1"
+          />
+          <ellipse cx="446.5" cy="671.2" rx="2.3" ry="1.1" fill="url(#ayeshaNailGrad)" />
+          {/* Solitary 18K Gold Ring Band on Ring Finger */}
+          <rect x="466" y="666.5" width="2.8" height="4.8" rx="0.8" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.6" />
+          <line x1="467.4" y1="666.8" x2="467.4" y2="671" stroke="#ffffff" strokeWidth="0.6" opacity="0.8" />
+
+          {/* Little Finger (Pinky) Curled Delicately */}
+          <path
+            d="M 500 667 C 486 669, 472 672, 456 675 C 453 676, 455 678, 459 678 C 472 676, 486 673, 502 670 Z"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="1"
+          />
+          <ellipse cx="457.5" cy="676.8" rx="2.1" ry="1" fill="url(#ayeshaNailGrad)" />
+
+          {/* Fine Knuckle Joint Accents */}
+          <line x1="472" y1="655" x2="473" y2="659" stroke="#a66843" strokeWidth="0.8" opacity="0.6" />
+          <line x1="468" y1="662" x2="469" y2="666" stroke="#a66843" strokeWidth="0.8" opacity="0.6" />
         </g>
       </g>
     );

@@ -4,6 +4,7 @@ import RasaiChoreography from './RasaiChoreography';
 import HamburgerButton from './HamburgerButton';
 import OutlineNavbar from './OutlineNavbar';
 import WatchStoryButton from './WatchStoryButton';
+import { RasaiUrduCalligraphy } from '../common/RasaiUrduCalligraphy';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface HeroSectionProps {
@@ -104,14 +105,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
       {/* Header section with Outline Navbar on left, live clock & CTA on right */}
       <header className="absolute top-0 left-0 w-full px-5 sm:px-7 py-4.5 z-60 flex items-center justify-between gap-4 animate-fade-in-header">
-        {/* MOBILE BRAND (below 768px only) */}
-        <span
-          className={`md:hidden font-urdu text-[22px] select-none leading-none transition-colors ${
-            isDark ? 'text-white' : 'text-slate-900'
-          }`}
-        >
-          رسائی
-        </span>
+        {/* BRAND (Mobile Header) */}
+        <RasaiUrduCalligraphy
+          height={26}
+          variant={isDark ? 'white' : 'dark'}
+          className="select-none transition-opacity hover:opacity-80"
+        />
 
         {/* LEFT: Outline Navbar (Desktop) */}
         <div className="hidden md:flex items-center">

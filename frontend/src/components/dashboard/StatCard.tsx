@@ -1,6 +1,5 @@
 // src/components/dashboard/StatCard.tsx
 import React from 'react';
-import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
 export interface StatCardProps {
@@ -21,79 +20,39 @@ export const StatCard: React.FC<StatCardProps> = ({
   const isVeryLong = value.length > 12;
 
   const valueFontSize = isVeryLong
-    ? 'text-xl sm:text-2xl xl:text-3xl'
+    ? 'text-xs sm:text-sm md:text-base lg:text-lg xl:text-3xl'
     : isLong
-    ? 'text-2xl sm:text-3xl xl:text-4xl'
-    : 'text-3xl sm:text-4xl xl:text-5xl';
+    ? 'text-sm sm:text-base md:text-lg lg:text-xl xl:text-4xl'
+    : 'text-lg sm:text-xl md:text-2xl lg:text-2xl xl:text-5xl';
 
   return (
     <div
       className={cn(
-        'relative w-full h-[200px] rounded-xl overflow-hidden p-[2px] bg-gradient-to-br from-neutral-800 via-neutral-900 to-black select-none',
+        'relative w-full h-[110px] sm:h-[125px] md:h-[135px] lg:h-[145px] xl:h-[170px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 sm:p-3 md:p-3.5 lg:p-4 xl:p-5 flex flex-col items-center justify-center text-center select-none shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors',
         className,
       )}
     >
-      {/* Moving halo */}
-      <motion.div
-        className="absolute w-12 h-12 rounded-full bg-white/20 blur-xl pointer-events-none"
-        animate={{
-          top: ['10%', '10%', '75%', '75%', '10%'],
-          left: ['10%', '80%', '80%', '10%', '10%'],
-        }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-      />
-
-      {/* Inner Card */}
-      <div className="relative flex flex-col items-center justify-center w-full h-full rounded-lg border border-white/10 bg-gradient-to-br from-neutral-900/80 to-black/60 backdrop-blur-md px-3 text-center">
-        {/* Rotating Ray */}
-        <motion.div
-          className="absolute w-[220px] h-[50px] rounded-full bg-white/10 blur-2xl pointer-events-none"
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
-        />
-
-        {/* Value */}
-        <motion.div
-          className={cn(
-            'font-extrabold font-mono tabular-nums tracking-tight bg-gradient-to-r from-white via-gray-300 to-white bg-clip-text text-transparent',
-            valueFontSize,
-          )}
-          animate={{
-            textShadow: [
-              '0 0 10px rgba(255,255,255,0.6)',
-              '0 0 2px rgba(255,255,255,0.2)',
-              '0 0 10px rgba(255,255,255,0.6)',
-            ],
-          }}
-          transition={{ duration: 4, repeat: Infinity }}
-        >
-          {value}
-        </motion.div>
-
-        {/* Label */}
-        <div className="mt-3 text-sm sm:text-base font-bold uppercase tracking-wider text-neutral-100">
-          {label}
-        </div>
-
-        {/* Subtext */}
-        {subtext && (
-          <div className="mt-1.5 text-xs sm:text-[13px] font-mono text-neutral-300 font-medium tracking-normal">
-            {subtext}
-          </div>
+      {/* Value */}
+      <div
+        className={cn(
+          'font-extrabold font-mono tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100',
+          valueFontSize,
         )}
-
-        {/* Subtle lines */}
-        <motion.div
-          className="absolute top-[12%] w-[80%] h-[1px] bg-gradient-to-r from-white/30 to-transparent pointer-events-none"
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 6, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute bottom-[12%] w-[80%] h-[1px] bg-gradient-to-r from-transparent to-white/30 pointer-events-none"
-          animate={{ opacity: [1, 0.4, 1] }}
-          transition={{ duration: 6, repeat: Infinity }}
-        />
+      >
+        {value}
       </div>
+
+      {/* Label */}
+      <div className="mt-1 sm:mt-1.5 md:mt-2 xl:mt-3 text-[11px] sm:text-xs md:text-xs lg:text-xs xl:text-base font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+        {label}
+      </div>
+
+      {/* Subtext */}
+      {subtext && (
+        <div className="mt-0.5 sm:mt-1 xl:mt-1.5 text-[9px] sm:text-[10px] md:text-[10px] lg:text-[11px] xl:text-[13px] font-mono text-zinc-500 dark:text-zinc-400 font-medium tracking-tight truncate max-w-full px-1">
+          {subtext}
+        </div>
+      )}
     </div>
   );
 };

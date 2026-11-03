@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Gulzar&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @plugin "daisyui"{
   themes: 'black'
@@ -65,7 +65,9 @@ td {
 
 /* Preserve Urdu calligraphy when explicitly requested */
 .font-urdu,
-.font-urdu * {
+.font-urdu *,
+[lang="ur"],
+[lang="ur"] * {
   font-family: "Noto Nastaliq Urdu", "Gulzar", "Noto Sans Arabic", "Urdu Typesetting", "Segoe UI Historic", Tahoma, sans-serif !important;
 }
 

@@ -1394,12 +1394,13 @@ export const Scene2CityRush = React.forwardRef<Scene2Handle, Scene2CityRushProps
 
           {/* -----------------------------------------------------------------------
               TYPEWRITER SPEECH BUBBLE (KAMRAN'S URGENT MISSION DIALOGUE)
-              Positioned clearly above Kamran pointing to his helmet at (975, 450)
+              Centered horizontally on screen at x = 680 (width 560 on 1920 viewBox)
+              Pointer tip at local x = 295 aligns with Kamran's helmet at x = 975
               ----------------------------------------------------------------------- */}
-          <g ref={speechBubbleGroupRef} transform="translate(820, 310)" style={{ display: 'none' }}>
+          <g ref={speechBubbleGroupRef} transform="translate(680, 310)" style={{ display: 'none' }}>
             {/* Speech Bubble Pointer pointing directly to helmet */}
-            <polygon points="150,96 150,136 178,96" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.8" />
-            <line x1="151" y1="96" x2="177" y2="96" stroke="#0b0f17" strokeWidth="2.5" />
+            <polygon points="280,96 295,136 310,96" fill="#0b0f17" stroke="#c9a47a" strokeWidth="1.8" />
+            <line x1="281" y1="96" x2="309" y2="96" stroke="#0b0f17" strokeWidth="2.5" />
             
             {/* ForeignObject Speech Box with True HTML Padding and Word Wrapping */}
             <foreignObject x="0" y="0" width="560" height="116" className="overflow-visible pointer-events-none">

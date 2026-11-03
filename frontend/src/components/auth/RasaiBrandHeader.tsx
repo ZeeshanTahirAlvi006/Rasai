@@ -3,6 +3,7 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { RasaiLogo } from './RasaiLogo';
+import { RasaiUrduCalligraphy } from '../common/RasaiUrduCalligraphy';
 
 interface RasaiBrandHeaderProps {
   className?: string;
@@ -71,21 +72,11 @@ export const RasaiBrandHeader: React.FC<RasaiBrandHeaderProps> = ({ className = 
           }}
           title="Return to Home"
         >
-          <span
-            dir="rtl"
-            lang="ur"
-            style={{
-              fontFamily: 'var(--font-urdu, "Noto Nastaliq Urdu", "Gulzar", serif)',
-              fontSize: '1.6rem',
-              fontWeight: 400,
-              color: '#ffffff',
-              lineHeight: 1,
-              transition: 'opacity 0.2s ease',
-            }}
-            className="hover:opacity-80"
-          >
-            رسائی
-          </span>
+          <RasaiUrduCalligraphy
+            height={26}
+            variant="white"
+            className="hover:opacity-80 transition-opacity"
+          />
         </Link>
       </div>
     </header>

@@ -1,5 +1,6 @@
 // src/pages/dashboard/SettingsPage.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   User,
   Shield,
@@ -21,6 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 import CarrierBadge from '../../components/shipments/CarrierBadge';
 
 export const SettingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user, accessToken, logout, logoutAll } = useAuth();
   const { theme, setTheme } = useTheme();
 
@@ -32,6 +34,7 @@ export const SettingsPage: React.FC = () => {
     try {
       await logout();
       toast.success('Logged out successfully');
+      navigate('/login');
     } catch (err: any) {
       toast.error('Logout error: ' + (err.message || 'Unknown'));
     } finally {
@@ -45,6 +48,7 @@ export const SettingsPage: React.FC = () => {
     try {
       await logoutAll();
       toast.success('All active sessions revoked');
+      navigate('/login');
     } catch (err: any) {
       toast.error('Error revoking sessions: ' + (err.message || 'Unknown'));
     } finally {

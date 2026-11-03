@@ -1,4 +1,5 @@
 import React,{createContext,useContext,useState,useEffect} from 'react'
+import { useNavigate } from 'react-router';
 import API,{setInMemoryToken} from '../api/api';
 export interface IUser{
     _id:string,
@@ -19,6 +20,7 @@ export interface AuthContextType{
 
 const AuthContext = createContext<AuthContextType|undefined>(undefined);
 export const AuthProvider:React.FC<{children:React.ReactNode}>=({children})=>{
+    const navigate = useNavigate();
     const [accessToken, setAccessTokenState] = useState<string | null>(() => {
         return typeof window !== 'undefined' ? localStorage.getItem('ndr_access_token') : null;
     });
@@ -60,6 +62,7 @@ export const AuthProvider:React.FC<{children:React.ReactNode}>=({children})=>{
         }finally{
             setAccessToken(null)
             setUser(null);
+            navigate('/login');
         }
     };
 
@@ -70,7 +73,8 @@ export const AuthProvider:React.FC<{children:React.ReactNode}>=({children})=>{
             console.error(error.response.data)
         }finally{
             setAccessToken(null)
-            setUser(null)
+            setUser(null);
+            navigate('/login');
         }
     }
     return (

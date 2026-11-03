@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router';
 import {
   AlertTriangle,
   ArrowUpRight,
-  RefreshCw,
   Clock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -93,33 +92,8 @@ export const ExecutiveOverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-4 text-xs">
-      {/* Page Header Bar */}
-      <div className="p-4 border border-border bg-white dark:bg-zinc-950/80 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-              Dashboard
-            </h1>
-          </div>
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Real-time COD exposure, exception triage queues, and operational metrics.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchOverviewData}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-muted/60 text-zinc-800 dark:text-zinc-200 hover:text-black dark:hover:text-white hover:bg-muted transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-500' : ''}`} />
-            <span>SYNC NOW</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Top 5 KPI Cards (Exact User-Approved Names with Animated StatCard) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* Top 5 KPI Cards (Exact User-Approved Names with Responsive StatCard) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3.5">
         {/* Card 1: At Risk */}
         <StatCard
           label="At Risk"
@@ -153,6 +127,7 @@ export const ExecutiveOverviewPage: React.FC = () => {
           label="Defense"
           value={`PKR ${defenseMargin.toLocaleString()}`}
           subtext={`${disputedParcels.length} disputed parcels`}
+          className="col-span-2 sm:col-span-1 lg:col-span-1"
         />
       </div>
 

@@ -8,6 +8,7 @@ import Chapter03Doorstep from './Chapter03Doorstep';
 import Chapter04WhatsApp from './Chapter04WhatsApp';
 import Chapter05ManifestMargin from './Chapter05ManifestMargin';
 import LaunchpadStation from './LaunchpadStation';
+import { RasaiUrduCalligraphy } from '../../common/RasaiUrduCalligraphy';
 
 interface StationMeta {
   index: number;
@@ -173,9 +174,7 @@ export const HorizontalCinemaTrack: React.FC = () => {
       {/* Top Header Rail */}
       <header className="absolute top-0 left-0 right-0 z-40 px-6 sm:px-10 py-5 flex items-center justify-between pointer-events-auto">
         <div className="flex items-center gap-4">
-          <span className="font-urdu text-2xl font-bold text-white tracking-wide">
-            رسائی
-          </span>
+          <RasaiUrduCalligraphy height={26} variant="white" className="select-none" />
           <div className="hidden sm:flex items-center gap-2 font-mono text-[11px] text-white/50 border-l border-white/20 pl-4">
             <Compass className="w-3.5 h-3.5 text-[#c9a47a]" />
             <span>NATIONAL COD RESCUE VOYAGE</span>

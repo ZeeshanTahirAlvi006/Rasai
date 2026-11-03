@@ -1,5 +1,6 @@
 // src/components/shipments/QuickAuthModal.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   X,
   Key,
@@ -18,6 +19,7 @@ interface QuickAuthModalProps {
 }
 
 export const QuickAuthModal: React.FC<QuickAuthModalProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
   const { accessToken, setAccessToken, user, setUser, logout } = useAuth();
   const [username, setUsername] = useState('merchant1');
   const [password, setPassword] = useState('Password123!');
@@ -117,11 +119,13 @@ export const QuickAuthModal: React.FC<QuickAuthModalProps> = ({ isOpen, onClose 
 
               {accessToken && (
                 <button
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     setAccessToken(null);
                     setInMemoryToken(null);
                     toast.success('Logged out');
+                    onClose();
+                    navigate('/login');
                   }}
                   className="px-3 py-1 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-colors"
                 >
