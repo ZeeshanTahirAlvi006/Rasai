@@ -103,3 +103,32 @@ Across all features and modules in the NDR project, every agent and developer mu
 - **CSV Formula Injection Neutralization**:
   - All CSV exports must sanitize cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` by prepending `'` prior to RFC-4180 quoting.
 
+---
+
+## 7. Cinematic Scrollytelling & 3D Vector Rendering Standards
+
+- **Unified Sticky Stage & Zero-Re-Render Scroll Physics**:
+  - Orchestrate multi-scene scroll films inside a single unified `sticky top-0 h-dvh` viewport using imperative `forwardRef` scene handles (`setProgress(progress)`, `setActive(active)`) to prevent sticky-handoff seams.
+  - Drive scroll progress via delta-time (`dt`) normalized exponential damping (`DAMPING_LAMBDA = 9.5`, `MAX_PROGRESS_SPEED`, `MAX_FLING_LEAD`) inside `requestAnimationFrame`, mutating DOM/SVG refs directly in `applyScrollMutations(progress)` with zero React state updates during scroll.
+  - Gate offscreen scenes and pause ambient CSS/canvas loops via `IntersectionObserver` (`visibility: hidden`, paused animation classes), and respect `@media (prefers-reduced-motion: reduce)`.
+- **100% Native Vector SVG Scaling & High-DPI Compositor Hygiene**:
+  - Never apply large CSS `transform: scale(...)` with `will-change: transform` to zoomed containers (prevents bitmap rasterization blur and QHD+/4K GPU tile eviction rectangles).
+  - Execute large camera zooms by mutating `<g transform="translate(...) scale(...)">` attributes inside `<svg viewBox="0 0 1920 1080">`, and render full-bleed volumetric clouds on a single-texture `<canvas>` (`dpr <= 1.5`).
+- **3D Perspective Accuracy, Grounding & Visual Restraint**:
+  - All 3D SVG characters and props must strictly obey the room's camera horizon and perspective (e.g., rear-facing laptops show only the 16:10 unibody shell, chamfered edges, hinge exhaust vents, and a single centered emblem without text clutter).
+  - Lock outer hardware chassis dimensions on 3D devices (smartphones, tablets, laptops) with a fixed-height `overflow-hidden` screen viewport; scroll new chat bubbles or UI states internally via `translate3d(0, -y, 0)` so the physical device size never changes.
+  - Ground every surface prop with multi-layer ambient + high-opacity contact shadows.
+  - Avoid hanging ceiling clutter that collides with upper framing, strip noisy rotating card halos/developer HUDs from narrative scenes, and keep story captions concise (max 2 lines, legible `>= 11px–13px` typography).
+
+---
+
+## 8. Table Styling & Project Terminology Standards
+
+- **Zero Background Pills for Table Items**:
+  - Never add background pills, capsule shapes, or border boxes for table items (such as Carrier badges or Status badges).
+  - Table items must always render as clean, unadorned plain text (with semantic text color styling only).
+- **Price/Amount Terminology**:
+  - Always use "Price" or "Amount" instead of "COD" across the project UI, table column headers, and display labels.
+
+
+

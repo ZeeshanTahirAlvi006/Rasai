@@ -98,7 +98,7 @@ export const ShipmentDetailModal: React.FC<ShipmentDetailModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                <span>COD Amount</span>
+                <span>Amount</span>
               </div>
               <p className="text-base font-semibold text-slate-100 font-mono">
                 PKR {shipment.orderValueCOD.toLocaleString()}

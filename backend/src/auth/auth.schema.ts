@@ -39,9 +39,11 @@ export const GetMeHeaderSchema = z.object({
 
 export const RefreshTokenCookieSchema = z.object({
     cookies: z.object({
-        refreshToken: z.string({ error: "Refresh token is missing" })
-            .min(1, "refresh token can not be empty")
-    })
+        refreshToken: z.string().min(1).optional()
+    }).optional(),
+    body: z.object({
+        refreshToken: z.string().min(1).optional()
+    }).optional()
 })
 //verify email function
 export const VerifyEmailBodySchema = z.object({

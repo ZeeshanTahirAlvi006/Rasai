@@ -36,7 +36,7 @@ export interface IOutboxMessageItem {
   leaseUntil?: string;
   leaseVersion: number;
   relayClaimToken?: string;
-  lastError?: string;
+  lastError?: string | { code?: number; message?: string } | any;
   metaMessageId?: string;
   sentAt?: string;
   createdAt: string;

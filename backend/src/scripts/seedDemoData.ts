@@ -104,7 +104,7 @@ export async function seedDemoData(): Promise<void> {
   for (const c of creds) {
     await MerchantCarrierCredential.create({
       merchantId,
-      carrier: c.carrier,
+      carrier: c.carrier as any,
       accountNumber: c.accountNumber,
       apiKeyEncrypted: Buffer.from(`demo-api-key-${c.carrier.toLowerCase()}`).toString('base64'),
       apiSecretEncrypted: Buffer.from(`demo-api-secret-${c.carrier.toLowerCase()}`).toString('base64'),
@@ -720,14 +720,14 @@ export async function seedDemoData(): Promise<void> {
       recipientPhone: ob.shipment.customerPhone,
       recipientPhoneHash: ob.shipment.customerPhoneHash,
       dedupeKey: `outbox:${ob.shipment._id}:${ob.messageType}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
-      channel: ob.channel,
-      messageType: ob.messageType,
+      channel: ob.channel as any,
+      messageType: ob.messageType as any,
       payload: {
         trackingNumber: ob.shipment.trackingNumber,
         carrier: ob.shipment.carrier,
         orderValueCOD: ob.shipment.orderValueCOD,
       },
-      status: ob.status,
+      status: ob.status as any,
       scheduledFor: ob.scheduledFor,
       leaseVersion: 0,
       attempts: ob.status === 'DISPATCHED' ? 1 : 0,
@@ -778,7 +778,7 @@ export async function seedDemoData(): Promise<void> {
       recipientPhoneHash: cdr.recipientPhoneHash,
       callTimestamp: cdr.callTimestamp,
       durationSeconds: cdr.durationSeconds,
-      callStatus: cdr.callStatus,
+      callStatus: cdr.callStatus as any,
     });
   }
   console.log(`   ✅ ${cdrRecords.length} CDR call log entries seeded`);
@@ -1034,7 +1034,7 @@ export async function seedDemoData(): Promise<void> {
   ];
 
   for (const a of alertDefs) {
-    await OpsAlert.create(a);
+    await OpsAlert.create(a as any);
   }
   console.log(`   ✅ ${alertDefs.length} Operational Alerts generated`);
 

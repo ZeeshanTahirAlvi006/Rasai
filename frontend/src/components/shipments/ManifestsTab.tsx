@@ -1,5 +1,6 @@
 // src/components/shipments/ManifestsTab.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+// 07:30 PKT automated station run-sheet dispatch, pending manifests, and batch archive.
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FileSpreadsheet,
   FileText,
@@ -7,7 +8,6 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  Download,
   ExternalLink,
   Plus,
   Trash2,
@@ -22,6 +22,11 @@ import {
   ArrowUpRight,
   Copy,
   Check,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Filter,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type {
@@ -40,29 +45,32 @@ import {
   upsertCarrierStation,
   deleteCarrierStation,
 } from '../../api/manifestApi';
-import CarrierBadge from './CarrierBadge';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table';
+import { cn } from '../../lib/utils';
 
+const CARRIER_LABELS: Record<string, string> = {
+  POSTEX: 'PostEx',
+  TRAX: 'Trax',
+  LEOPARDS: 'Leopards',
+  TCS: 'TCS',
+};
+
+// Plain text status labels with clean semantic text color (Zero background/pill per project standard)
 const STATUS_CONFIG: Record<
   ManifestStatus,
-  { label: string; bg: string; text: string; border: string }
+  { label: string; textClass: string }
 > = {
   SENT: {
     label: 'Dispatched',
-    bg: 'bg-emerald-500/10',
-    text: 'text-emerald-400',
-    border: 'border-emerald-500/30',
+    textClass: 'text-emerald-600 dark:text-emerald-400 font-bold',
   },
   STARTED: {
     label: 'Compiling',
-    bg: 'bg-amber-500/10',
-    text: 'text-amber-400',
-    border: 'border-amber-500/30',
+    textClass: 'text-amber-600 dark:text-amber-400 font-bold',
   },
   FAILED: {
     label: 'Failed',
-    bg: 'bg-rose-500/10',
-    text: 'text-rose-400',
-    border: 'border-rose-500/30',
+    textClass: 'text-rose-600 dark:text-rose-400 font-bold',
   },
 };
 
@@ -80,7 +88,6 @@ export const ManifestsTab: React.FC = () => {
   });
   const [totalBatches, setTotalBatches] = useState<number>(0);
   const [loadingBatches, setLoadingBatches] = useState<boolean>(true);
-  const [carrierFilter, setCarrierFilter] = useState<string>('');
 
   // Pending parcels state
   const [pendingParcels, setPendingParcels] = useState<PendingManifestParcelItem[]>([]);
@@ -91,24 +98,34 @@ export const ManifestsTab: React.FC = () => {
   const [stations, setStations] = useState<CarrierStationItem[]>([]);
   const [loadingStations, setLoadingStations] = useState<boolean>(false);
 
-  // Modals & Action loading
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [carrierFilter, setCarrierFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
+  // Row Accordion Expanded IDs
+  const [expandedBatchIds, setExpandedBatchIds] = useState<Set<string>>(new Set());
+  const [expandedPendingIds, setExpandedPendingIds] = useState<Set<string>>(new Set());
+  const [expandedStationIds, setExpandedStationIds] = useState<Set<string>>(new Set());
+
+  // Drawers & Action loading
   const [compiling, setCompiling] = useState<boolean>(false);
-  const [stationModalOpen, setStationModalOpen] = useState<boolean>(false);
+  const [compileDrawerOpen, setCompileDrawerOpen] = useState<boolean>(false);
+  const [compileCarrier, setCompileCarrier] = useState<string>('');
+  const [compileStationCode, setCompileStationCode] = useState<string>('');
+
+  const [stationDrawerOpen, setStationDrawerOpen] = useState<boolean>(false);
   const [editingStation, setEditingStation] = useState<CarrierStationItem | null>(null);
+  const [savingStation, setSavingStation] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // New Station Form State
+  // Station Form State
   const [stationCarrier, setStationCarrier] = useState<'POSTEX' | 'TRAX' | 'LEOPARDS' | 'TCS'>('POSTEX');
   const [stationCode, setStationCode] = useState<string>('');
   const [stationName, setStationName] = useState<string>('');
   const [stationCity, setStationCity] = useState<string>('');
   const [managerEmail, setManagerEmail] = useState<string>('');
   const [managerWhatsAppPhone, setManagerWhatsAppPhone] = useState<string>('');
-
-  // Manual Compile Modal State
-  const [compileModalOpen, setCompileModalOpen] = useState<boolean>(false);
-  const [compileCarrier, setCompileCarrier] = useState<string>('');
-  const [compileStationCode, setCompileStationCode] = useState<string>('');
 
   // Fetch batches
   const fetchBatches = useCallback(async () => {
@@ -152,14 +169,31 @@ export const ManifestsTab: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
+  const refreshAll = useCallback(() => {
     fetchBatches();
     fetchPendingParcels();
     fetchStations();
   }, [fetchBatches, fetchPendingParcels, fetchStations]);
 
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  // Handle ESC key to dismiss slide-over drawers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (compileDrawerOpen) setCompileDrawerOpen(false);
+        if (stationDrawerOpen) setStationDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [compileDrawerOpen, stationDrawerOpen]);
+
   // Handle Download PDF/CSV
-  const handleDownload = async (batchId: string, format: 'pdf' | 'csv') => {
+  const handleDownload = async (batchId: string, format: 'pdf' | 'csv', e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       toast.loading(`Downloading ${format.toUpperCase()}...`, { id: `dl-${batchId}` });
       await downloadManifestArtifact(batchId, format);
@@ -170,7 +204,8 @@ export const ManifestsTab: React.FC = () => {
   };
 
   // Handle Manual Compilation
-  const handleTriggerCompilation = async () => {
+  const handleTriggerCompilation = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCompiling(true);
     try {
       const payload: { carrier?: string; stationCode?: string } = {};
@@ -179,7 +214,9 @@ export const ManifestsTab: React.FC = () => {
 
       const res = await triggerManifestCompilation(payload);
       toast.success(`Successfully compiled ${res.data.compiledCount} run-sheet batch(es)`);
-      setCompileModalOpen(false);
+      setCompileDrawerOpen(false);
+      setCompileCarrier('');
+      setCompileStationCode('');
       fetchBatches();
       fetchPendingParcels();
     } catch (err: any) {
@@ -189,8 +226,9 @@ export const ManifestsTab: React.FC = () => {
     }
   };
 
-  // Open Upsert Station Modal
-  const handleOpenStationModal = (st?: CarrierStationItem) => {
+  // Open Upsert Station Drawer
+  const handleOpenStationDrawer = (st?: CarrierStationItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (st) {
       setEditingStation(st);
       setStationCarrier(st.carrier);
@@ -208,10 +246,10 @@ export const ManifestsTab: React.FC = () => {
       setManagerEmail('');
       setManagerWhatsAppPhone('');
     }
-    setStationModalOpen(true);
+    setStationDrawerOpen(true);
   };
 
-  // Save Station
+  // Save Station Contact
   const handleSaveStation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stationCode.trim() || !stationName.trim()) {
@@ -219,6 +257,7 @@ export const ManifestsTab: React.FC = () => {
       return;
     }
 
+    setSavingStation(true);
     try {
       await upsertCarrierStation({
         carrier: stationCarrier,
@@ -230,15 +269,18 @@ export const ManifestsTab: React.FC = () => {
         isActive: true,
       });
       toast.success('Station contact saved successfully');
-      setStationModalOpen(false);
+      setStationDrawerOpen(false);
       fetchStations();
     } catch (err: any) {
       toast.error(err.message || 'Failed to save station contact');
+    } finally {
+      setSavingStation(false);
     }
   };
 
   // Delete Station
-  const handleDeleteStation = async (id: string) => {
+  const handleDeleteStation = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this carrier station contact?')) return;
     try {
       await deleteCarrierStation(id);
@@ -250,775 +292,1479 @@ export const ManifestsTab: React.FC = () => {
   };
 
   // Copy Escalation Link
-  const handleCopyLink = (link: string, id: string) => {
+  const handleCopyLink = (link: string, id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     navigator.clipboard.writeText(link);
     setCopiedLink(id);
     toast.success('WhatsApp escalation link copied to clipboard');
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
+  // Accordion Toggle Handlers
+  const toggleBatchExpand = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedBatchIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePendingExpand = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedPendingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleStationExpand = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedStationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Filtered Batches
+  const filteredBatches = useMemo(() => {
+    return batches.filter((b) => {
+      if (statusFilter && b.status !== statusFilter) return false;
+      if (carrierFilter && b.carrier !== carrierFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const date = (b.dateKey || '').toLowerCase();
+      const station = (b.stationCode || '').toLowerCase();
+      const carrier = (b.carrier || '').toLowerCase();
+      const email = (b.recipientEmail || '').toLowerCase();
+      const id = (b._id || '').toLowerCase();
+      return (
+        date.includes(q) ||
+        station.includes(q) ||
+        carrier.includes(q) ||
+        email.includes(q) ||
+        id.includes(q)
+      );
+    });
+  }, [batches, statusFilter, carrierFilter, searchQuery]);
+
+  // Filtered Pending Parcels
+  const filteredPending = useMemo(() => {
+    return pendingParcels.filter((p) => {
+      if (carrierFilter && p.carrier !== carrierFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const track = (p.trackingNumber || '').toLowerCase();
+      const station = (p.destinationStationCode || '').toLowerCase();
+      const carrier = (p.carrier || '').toLowerCase();
+      const phone = (p.customerPhonePlain || p.customerPhoneMasked || '').toLowerCase();
+      return (
+        track.includes(q) ||
+        station.includes(q) ||
+        carrier.includes(q) ||
+        phone.includes(q)
+      );
+    });
+  }, [pendingParcels, carrierFilter, searchQuery]);
+
+  // Filtered Stations
+  const filteredStations = useMemo(() => {
+    return stations.filter((s) => {
+      if (carrierFilter && s.carrier !== carrierFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const code = (s.stationCode || '').toLowerCase();
+      const name = (s.stationName || '').toLowerCase();
+      const city = (s.city || '').toLowerCase();
+      const carrier = (s.carrier || '').toLowerCase();
+      const email = (s.managerEmail || '').toLowerCase();
+      const phone = (s.managerWhatsAppPhone || '').toLowerCase();
+      return (
+        code.includes(q) ||
+        name.includes(q) ||
+        city.includes(q) ||
+        carrier.includes(q) ||
+        email.includes(q) ||
+        phone.includes(q)
+      );
+    });
+  }, [stations, carrierFilter, searchQuery]);
+
   return (
-    <div className="space-y-4 font-mono text-xs">
-      {/* Page Header Bar */}
-      <div className="p-4 border border-zinc-800 bg-zinc-950/80 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-white uppercase tracking-wider">
-              Dispatch
-            </h1>
-            <span className="text-[10px] text-purple-400 bg-purple-500/10 px-2 py-0.5 border border-purple-500/30 font-bold">
-              07:30 PKT RUN-SHEETS
-            </span>
-          </div>
-          <p className="text-[11px] text-zinc-400 mt-0.5">
-            07:30 PKT automated station run-sheet dispatch, pending manifests, and batch archive.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchBatches}
-            disabled={loadingBatches}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900 text-zinc-200 hover:text-white hover:bg-zinc-800 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingBatches ? 'animate-spin text-purple-400' : ''}`} />
-            <span>REFRESH</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Section 1: Schedule */}
-      <div className="space-y-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-          Schedule
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-indigo-400 text-xs mb-1">
-            <span>07:30 PKT SCHEDULE</span>
-            <Clock className="w-4 h-4" />
-          </div>
-          <div className="text-xl font-bold font-mono text-white">Daily Run</div>
-          <div className="text-[10px] text-emerald-400 mt-0.5 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Automated BullMQ</span>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-cyan-400 text-xs mb-1">
-            <span>BATCHES TODAY</span>
-            <Layers className="w-4 h-4" />
-          </div>
-          <div className="text-xl font-bold font-mono text-cyan-300">{totalBatches}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Station Run-Sheets</div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-emerald-400 text-xs mb-1">
-            <span>DISPATCHED</span>
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <div className="text-xl font-bold font-mono text-emerald-300">{summary.SENT}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">PDF + CSV Emailed</div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-purple-400 text-xs mb-1">
-            <span>PARCELS SENT</span>
-            <FileSpreadsheet className="w-4 h-4" />
-          </div>
-          <div className="text-xl font-bold font-mono text-purple-300">{summary.totalParcelsSent}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Dispatched to Couriers</div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-amber-400 text-xs mb-1">
-            <span>PENDING RUN-SHEET</span>
-            <AlertTriangle className="w-4 h-4" />
-          </div>
-          <div className="text-xl font-bold font-mono text-amber-300">{totalPending}</div>
-          <div className="text-[10px] text-amber-500/80 mt-0.5">Needs Station Run-Sheet</div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-            <span>STATIONS</span>
-            <Building2 className="w-4 h-4 text-slate-300" />
-          </div>
-          <div className="text-xl font-bold font-mono text-white">{stations.length}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Directory Contacts</div>
-        </div>
-      </div>
-      </div>
-
-      {/* Subtab Navigation Pill Bar */}
-      <div className="flex items-center justify-between gap-3 p-1.5 rounded-2xl bg-slate-900/90 border border-white/10">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveSubView('pending')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase transition-all border ${
-              activeSubView === 'pending'
-                ? 'bg-zinc-100 text-zinc-950 border-white'
-                : 'text-zinc-400 hover:text-white bg-zinc-900 border-zinc-800'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>Pending</span>
-            {totalPending > 0 && (
-              <span className="px-1.5 py-0.2 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                {totalPending}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveSubView('batches')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase transition-all border ${
-              activeSubView === 'batches'
-                ? 'bg-zinc-100 text-zinc-950 border-white'
-                : 'text-zinc-400 hover:text-white bg-zinc-900 border-zinc-800'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Archive</span>
-            <span className="px-1.5 py-0.2 text-[10px] bg-black/40">
-              {totalBatches}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubView('stations')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase transition-all border ${
-              activeSubView === 'stations'
-                ? 'bg-zinc-100 text-zinc-950 border-white'
-                : 'text-zinc-400 hover:text-white bg-zinc-900 border-zinc-800'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Station Directory</span>
-            <span className="px-1.5 py-0.2 text-[10px] bg-black/40">
-              {stations.length}
-            </span>
-          </button>
-        </div>
-
-        {/* Action Button for Current Subview */}
-        <div className="flex items-center gap-2">
-          {activeSubView === 'batches' && (
+    <div className="space-y-3 font-mono text-xs select-none">
+      {/* ============================================================ */}
+      {/* 1. TOP PIPELINE TELEMETRY & OPERATIONS COMMAND BAR           */}
+      {/* ============================================================ */}
+      <div className="border border-border bg-white dark:bg-black p-2.5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
+          {/* Header Action Controls */}
+          <div className="flex items-center justify-between lg:justify-start gap-2 shrink-0">
             <button
-              onClick={() => setCompileModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-md shadow-indigo-950/40 transition-all"
+              onClick={() => setCompileDrawerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 hover:opacity-85 transition-opacity cursor-pointer whitespace-nowrap"
+              title="Compile Station Run-Sheets Now"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span>Compile Run-Sheets Now</span>
+              <span>Compile Run Sheet</span>
             </button>
-          )}
 
-          {activeSubView === 'stations' && (
-            <button
-              onClick={() => handleOpenStationModal()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-md shadow-emerald-950/40 transition-all"
+            {/* Mobile Action Controls (< lg) */}
+            <div className="flex items-center gap-1.5 lg:hidden">
+              {activeSubView === 'stations' && (
+                <button
+                  onClick={() => handleOpenStationDrawer()}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 hover:opacity-85 transition-opacity cursor-pointer whitespace-nowrap"
+                  title="Add Courier Station Contact"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Station</span>
+                </button>
+              )}
+              <button
+                onClick={refreshAll}
+                disabled={loadingBatches || loadingPending || loadingStations}
+                title="Refresh dispatch state"
+                className="p-1 border border-border bg-white dark:bg-black text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                <RefreshCw
+                  className={cn(
+                    'w-3.5 h-3.5',
+                    loadingBatches || loadingPending || loadingStations ? 'animate-spin' : ''
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Telemetry Metrics (Static Badges) */}
+          <div className="flex items-center gap-1 sm:gap-1.5 w-full lg:w-auto text-xs overflow-x-auto pb-0.5 scrollbar-none">
+            {/* All Batches */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Total run-sheet batches"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Station Contact</span>
-            </button>
-          )}
+              <span>Batches:</span>
+              <span className="font-mono text-[10px] sm:text-[11px] font-bold text-zinc-900 dark:text-zinc-100">
+                {totalBatches}
+              </span>
+            </div>
 
-          <button
-            onClick={() => {
-              fetchBatches();
-              fetchPendingParcels();
-              fetchStations();
-            }}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition-all"
-            title="Refresh All Data"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${
-                loadingBatches || loadingPending || loadingStations ? 'animate-spin' : ''
-              }`}
-            />
-          </button>
+            {/* Dispatched */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Dispatched batches"
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-500 hidden sm:inline shrink-0" />
+              <span>Dispatched:</span>
+              <span className="font-mono text-[10px] sm:text-[11px] font-bold text-zinc-900 dark:text-zinc-100">
+                {summary.SENT}
+              </span>
+            </div>
+
+            {/* Compiling */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Compiling batches"
+            >
+              <RefreshCw
+                className={cn(
+                  'w-3 h-3 text-amber-500 hidden sm:inline shrink-0',
+                  summary.STARTED > 0 && 'animate-spin'
+                )}
+              />
+              <span>Compiling:</span>
+              <span className="font-mono text-[10px] sm:text-[11px] font-bold text-zinc-900 dark:text-zinc-100">
+                {summary.STARTED}
+              </span>
+            </div>
+
+            {/* Failed */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Failed batches"
+            >
+              <AlertTriangle className={cn('w-3 h-3 shrink-0', summary.FAILED > 0 ? 'text-rose-500' : 'opacity-60 hidden sm:inline')} />
+              <span>Failed:</span>
+              <span className={cn('font-mono text-[10px] sm:text-[11px] font-bold', summary.FAILED > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-zinc-900 dark:text-zinc-100')}>
+                {summary.FAILED}
+              </span>
+            </div>
+
+            {/* Parcels Sent */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Total parcels successfully dispatched in run-sheets"
+            >
+              <FileSpreadsheet className="w-3 h-3 text-purple-500 hidden sm:inline shrink-0" />
+              <span>Parcels Sent:</span>
+              <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                {summary.totalParcelsSent}
+              </span>
+            </div>
+
+            {/* Pending Run-Sheets */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Pending parcels awaiting run-sheet dispatch"
+            >
+              <Clock className="w-3 h-3 opacity-70 hidden sm:inline shrink-0" />
+              <span>Pending:</span>
+              <span className="font-mono text-[10px] sm:text-[11px] font-bold text-zinc-900 dark:text-zinc-100">
+                {totalPending}
+              </span>
+            </div>
+
+            {/* Stations Directory */}
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 border border-border bg-muted/20 text-muted-foreground text-[10px] sm:text-[11px] whitespace-nowrap shrink-0"
+              title="Manage courier destination station contacts"
+            >
+              <Building2 className="w-3 h-3 opacity-70 hidden sm:inline shrink-0" />
+              <span>Stations:</span>
+              <span className="font-mono text-[10px] sm:text-[11px] font-bold text-zinc-900 dark:text-zinc-100">
+                {stations.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Desktop Action Controls (>= lg) */}
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
+            {activeSubView === 'stations' && (
+              <button
+                onClick={() => handleOpenStationDrawer()}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 hover:opacity-85 transition-opacity cursor-pointer whitespace-nowrap"
+                title="Add Courier Station Contact"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Station</span>
+              </button>
+            )}
+
+            <button
+              onClick={refreshAll}
+              disabled={loadingBatches || loadingPending || loadingStations}
+              title="Refresh dispatch state"
+              className="p-1 border border-border bg-white dark:bg-black text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              <RefreshCw
+                className={cn(
+                  'w-3.5 h-3.5',
+                  loadingBatches || loadingPending || loadingStations ? 'animate-spin' : ''
+                )}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* VIEW 1: 07:30 PKT Run-Sheet Batches */}
-      {activeSubView === 'batches' && (
-        <div className="space-y-4">
-          {/* Filter Bar */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-slate-400 font-medium">Filter by Carrier:</span>
-              <div className="flex gap-1.5">
-                {['', 'POSTEX', 'TRAX', 'LEOPARDS', 'TCS'].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setCarrierFilter(c)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
-                      carrierFilter === c
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                    }`}
-                  >
-                    {c || 'All Carriers'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-[11px] text-slate-500 font-mono">
-              Pure PDF 1.4 + RFC-4180 Formula-Sanitized CSV Artifacts
-            </div>
-          </div>
-
-          {/* Batches Table */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider font-mono text-[10px] border-b border-white/10">
-                  <tr>
-                    <th className="py-3 px-4">Date & Carrier</th>
-                    <th className="py-3 px-4">Station Code</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Parcels</th>
-                    <th className="py-3 px-4">Total COD</th>
-                    <th className="py-3 px-4">Dispatched To</th>
-                    <th className="py-3 px-4 text-right">Artifacts & Downloads</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 font-mono">
-                  {loadingBatches ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
-                        <span>Loading manifest run-sheets...</span>
-                      </td>
-                    </tr>
-                  ) : batches.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500 font-sans">
-                        <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-                        <div className="text-sm font-medium text-slate-400">No manifest batches found</div>
-                        <div className="text-xs mt-1 text-slate-600">
-                          Batches are compiled daily at 07:30 PKT or via manual trigger.
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    batches.map((batch) => {
-                      const statusMeta = STATUS_CONFIG[batch.status] || STATUS_CONFIG.FAILED;
-
-                      return (
-                        <tr key={batch._id} className="hover:bg-white/2 transition-colors">
-                          <td className="py-3.5 px-4 font-sans">
-                            <div className="font-bold text-white font-mono">{batch.dateKey}</div>
-                            <div className="mt-1">
-                              <CarrierBadge carrier={batch.carrier} />
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-cyan-300 font-bold">
-                              {batch.stationCode}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusMeta.bg} ${statusMeta.text} ${statusMeta.border}`}
-                            >
-                              {statusMeta.label}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            <span className="text-white font-bold">{batch.parcelCount}</span>
-                            <span className="text-slate-500 text-[11px] ml-1">pkgs</span>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-emerald-400 font-bold">
-                            Rs. {batch.totalCOD.toLocaleString()}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-[11px] font-sans">
-                            {batch.recipientEmail ? (
-                              <div className="flex items-center gap-1.5 text-slate-300">
-                                <Mail className="w-3 h-3 text-cyan-400" />
-                                <span>{batch.recipientEmail}</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-500">Default Station Inbox</span>
-                            )}
-                            {batch.sentAt && (
-                              <div className="text-[10px] text-slate-500 mt-0.5">
-                                Sent {new Date(batch.sentAt).toLocaleTimeString()}
-                              </div>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right font-sans">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleDownload(batch._id, 'pdf')}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition-all"
-                                title="Download Pure PDF 1.4 Run-Sheet"
-                              >
-                                <FileText className="w-3 h-3" />
-                                <span>PDF</span>
-                              </button>
-
-                              <button
-                                onClick={() => handleDownload(batch._id, 'csv')}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-all"
-                                title="Download RFC-4180 Formula-Sanitized CSV"
-                              >
-                                <FileSpreadsheet className="w-3 h-3" />
-                                <span>CSV</span>
-                              </button>
-
-                              {batch.driveUrl && (
-                                <a
-                                  href={batch.driveUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
-                                  title="View on Google Drive"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* VIEW 2: Pending Parcels Queue & Tier 3 Escalation */}
-      {activeSubView === 'pending' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-xs">
-            <div>
-              <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <span>Pending Manifest Parcels Queue ({totalPending})</span>
-              </h3>
-              <p className="text-slate-400 text-xs mt-0.5">
-                Shipments with confirmed reschedule requests awaiting tomorrow's 07:30 PKT run-sheet dispatch.
-              </p>
-            </div>
-
-            <div className="text-[11px] text-amber-400/90 font-mono bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-xl">
-              Tier 3 Station Manager WhatsApp Escalations Enabled
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {loadingPending ? (
-              <div className="col-span-2 py-12 text-center text-slate-500">
-                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
-                <span>Loading pending manifest parcels...</span>
-              </div>
-            ) : pendingParcels.length === 0 ? (
-              <div className="col-span-2 py-12 text-center text-slate-500 rounded-2xl bg-slate-900/50 border border-white/5">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400 opacity-60" />
-                <div className="text-sm font-medium text-slate-300">All Parcels Manifested</div>
-                <div className="text-xs mt-1 text-slate-500">
-                  No shipments currently waiting for station run-sheet dispatch.
-                </div>
-              </div>
-            ) : (
-              pendingParcels.map((parcel) => (
-                <div
-                  key={parcel._id}
-                  className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-white/20 transition-all shadow-lg space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CarrierBadge carrier={parcel.carrier} />
-                        <span className="font-mono font-bold text-white text-xs">{parcel.trackingNumber}</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                        <span>Station:</span>
-                        <span className="px-1.5 py-0.2 rounded bg-black/40 text-cyan-300 font-bold border border-white/5">
-                          {parcel.destinationStationCode || 'MAIN'}
-                        </span>
-                        <span>•</span>
-                        <span className="text-emerald-400 font-bold">Rs. {parcel.orderValueCOD.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        {parcel.status}
-                      </span>
-                      {parcel.rescheduledDate && (
-                        <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-cyan-300 font-mono">
-                          <Calendar className="w-3 h-3" />
-                          <span>{parcel.rescheduledDate}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Customer & Location Details */}
-                  <div className="p-2.5 rounded-xl bg-slate-950 border border-white/5 space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-indigo-400" />
-                        <span className="font-mono">{parcel.customerPhonePlain || parcel.customerPhoneMasked}</span>
-                      </div>
-                      {parcel.customerCoordinates ? (
-                        <a
-                          href={`https://maps.google.com/?q=${parcel.customerCoordinates.lat},${parcel.customerCoordinates.lng}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-mono underline"
-                        >
-                          <MapPin className="w-3 h-3 text-rose-400" />
-                          <span>
-                            {parcel.customerCoordinates.lat.toFixed(4)}, {parcel.customerCoordinates.lng.toFixed(4)}
-                          </span>
-                        </a>
-                      ) : (
-                        <span className="text-[10px] text-slate-500">No GPS Pin</span>
-                      )}
-                    </div>
-
-                    {parcel.stationContact && (
-                      <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Courier Contact:</span>
-                        <span className="text-slate-300 font-mono">
-                          {parcel.stationContact.managerWhatsAppPhone || parcel.stationContact.managerEmail || 'Unassigned'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tier 3 Escalation Action Bar */}
-                  <div className="pt-1 flex items-center justify-between gap-2">
-                    <a
-                      href={parcel.escalationLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-1 py-2 px-3 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all"
-                    >
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                      <span>WhatsApp Station Manager (wa.me)</span>
-                    </a>
-
-                    <button
-                      onClick={() => handleCopyLink(parcel.escalationLink, parcel._id)}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
-                      title="Copy Escalation Deep-Link"
-                    >
-                      {copiedLink === parcel._id ? (
-                        <Check className="w-4 h-4 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* VIEW 3: Courier Station Directory */}
-      {activeSubView === 'stations' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-xs">
-            <div>
-              <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-cyan-400" />
-                <span>Courier Station Directory ({stations.length})</span>
-              </h3>
-              <p className="text-slate-400 text-xs mt-0.5">
-                Manage destination courier station contact info for direct daily run-sheets and Tier 3 WhatsApp escalation routing.
-              </p>
-            </div>
+      {/* ============================================================ */}
+      {/* 2. SUBVIEW NAVIGATION PILLS & UNIFIED SEARCH/FILTER TOOLBAR  */}
+      {/* ============================================================ */}
+      <div className="border border-border bg-white dark:bg-black p-2.5 shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          {/* Subview Navigation Tabs (Compact to fit small screens) */}
+          <div className="flex items-center gap-1 border-b sm:border-b-0 pb-1.5 sm:pb-0 border-border w-full sm:w-auto">
+            <button
+              onClick={() => setActiveSubView('batches')}
+              className={cn(
+                'flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1 border text-[11px] sm:text-xs font-bold uppercase transition-colors cursor-pointer whitespace-nowrap',
+                activeSubView === 'batches'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border-zinc-900 dark:border-zinc-100'
+                  : 'bg-muted/40 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Layers className="w-3 h-3 shrink-0" />
+              <span>Archive</span>
+              <span className="font-mono text-[10px] opacity-75">({totalBatches})</span>
+            </button>
 
             <button
-              onClick={() => handleOpenStationModal()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition-all"
+              onClick={() => setActiveSubView('pending')}
+              className={cn(
+                'flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1 border text-[11px] sm:text-xs font-bold uppercase transition-colors cursor-pointer whitespace-nowrap',
+                activeSubView === 'pending'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border-zinc-900 dark:border-zinc-100'
+                  : totalPending > 0
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                  : 'bg-muted/40 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
+              )}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Station Contact</span>
+              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+              <span>Pending</span>
+              <span className="font-mono text-[10px] opacity-75">({totalPending})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveSubView('stations')}
+              className={cn(
+                'flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1 border text-[11px] sm:text-xs font-bold uppercase transition-colors cursor-pointer whitespace-nowrap',
+                activeSubView === 'stations'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border-zinc-900 dark:border-zinc-100'
+                  : 'bg-muted/40 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Building2 className="w-3 h-3 shrink-0" />
+              <span>Stations</span>
+              <span className="font-mono text-[10px] opacity-75">({stations.length})</span>
             </button>
           </div>
+        </div>
 
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider font-mono text-[10px] border-b border-white/10">
-                  <tr>
-                    <th className="py-3 px-4">Carrier</th>
-                    <th className="py-3 px-4">Station Code</th>
-                    <th className="py-3 px-4">Station Name</th>
-                    <th className="py-3 px-4">City</th>
-                    <th className="py-3 px-4">Manager Email</th>
-                    <th className="py-3 px-4">Manager WhatsApp</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 font-mono">
-                  {loadingStations ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
-                        <span>Loading station directory...</span>
-                      </td>
-                    </tr>
-                  ) : stations.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500 font-sans">
-                        <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-                        <div className="text-sm font-medium text-slate-400">No carrier stations configured</div>
-                        <div className="text-xs mt-1 text-slate-600">
-                          Add station manager emails and WhatsApp numbers to enable automated run-sheets.
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    stations.map((st) => (
-                      <tr key={st._id} className="hover:bg-white/2 transition-colors">
-                        <td className="py-3 px-4 font-sans">
-                          <CarrierBadge carrier={st.carrier} />
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-cyan-300 font-bold">
-                            {st.stationCode}
+        {/* Unified Search & Filter Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
+            {/* Live Search Input */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={
+                  activeSubView === 'batches'
+                    ? 'Search date, station, email, carrier...'
+                    : activeSubView === 'pending'
+                    ? 'Search tracking, phone, station...'
+                    : 'Search station code, name, city, email...'
+                }
+                className="w-full pl-8 pr-7 py-1.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Carrier Filter Dropdown */}
+            <div className="flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black px-2 py-1">
+              <Filter className="w-3 h-3 text-zinc-400 shrink-0" />
+              <select
+                value={carrierFilter}
+                onChange={(e) => setCarrierFilter(e.target.value)}
+                className="bg-white dark:bg-black text-xs text-zinc-800 dark:text-zinc-200 focus:outline-hidden cursor-pointer dark:[color-scheme:dark]"
+              >
+                <option value="" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">ALL CARRIERS</option>
+                <option value="POSTEX" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">POSTEX</option>
+                <option value="TRAX" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">TRAX</option>
+                <option value="LEOPARDS" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">LEOPARDS</option>
+                <option value="TCS" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">TCS</option>
+              </select>
+            </div>
+
+            {/* Status Filter Dropdown */}
+            {activeSubView === 'batches' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-2.5 py-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black text-xs text-zinc-800 dark:text-zinc-200 focus:outline-hidden cursor-pointer dark:[color-scheme:dark]"
+              >
+                <option value="" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">ALL STATUSES</option>
+                <option value="SENT" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">SENT / DISPATCHED</option>
+                <option value="STARTED" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">STARTED / COMPILING</option>
+                <option value="FAILED" className="bg-white dark:bg-black text-zinc-900 dark:text-zinc-100">FAILED</option>
+              </select>
+            )}
+
+            {/* Reset Filters Button */}
+            {(carrierFilter || statusFilter || searchQuery) && (
+              <button
+                onClick={() => {
+                  setCarrierFilter('');
+                  setStatusFilter('');
+                  setSearchQuery('');
+                }}
+                className="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 underline font-semibold cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          {/* Showing Counter */}
+          <div className="text-[11px] text-zinc-500 font-mono shrink-0">
+            {activeSubView === 'batches' && `Showing ${filteredBatches.length} of ${batches.length} batches`}
+            {activeSubView === 'pending' && `Showing ${filteredPending.length} of ${pendingParcels.length} parcels`}
+            {activeSubView === 'stations' && `Showing ${filteredStations.length} of ${stations.length} stations`}
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* 3. SUBVIEW 1: BATCHES ARCHIVE TABLE                          */}
+      {/* ============================================================ */}
+      {activeSubView === 'batches' && (
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Batches Archive Table"
+          className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black shadow-xs focus:outline-hidden"
+        >
+          <Table className="max-h-[600px]">
+            <TableHeader className="bg-muted/30 sticky top-0 z-10">
+              <TableRow>
+                {/* 1. Date (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Date
+                </TableHead>
+
+                {/* 2. Carrier (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Carrier
+                </TableHead>
+
+                {/* 3. Status (Visible on sm+) */}
+                <TableHead className="hidden sm:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Status
+                </TableHead>
+
+                {/* 4. Station Code (Visible on md+) */}
+                <TableHead className="hidden md:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Station
+                </TableHead>
+
+                {/* 5. Parcels Count (Visible on md+) */}
+                <TableHead className="hidden md:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap text-right">
+                  Parcels
+                </TableHead>
+
+                {/* 6. Amount (Visible on lg+) */}
+                <TableHead className="hidden lg:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap text-right">
+                  Amount
+                </TableHead>
+
+                {/* 7. Recipient (Visible on xl+) */}
+                <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Recipient
+                </TableHead>
+
+                {/* 8. Actions (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-zinc-800 dark:text-zinc-200 font-mono">
+              {loadingBatches && batches.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-zinc-400" />
+                    <span>Loading manifest run-sheets...</span>
+                  </TableCell>
+                </TableRow>
+              ) : filteredBatches.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <FileSpreadsheet className="w-7 h-7 mx-auto mb-2 opacity-40 text-zinc-400" />
+                    <div className="font-semibold text-zinc-700 dark:text-zinc-300">No manifest batches found</div>
+                    <div className="text-[11px] mt-0.5">
+                      Batches compile automatically daily at 07:30 PKT or via immediate trigger.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredBatches.map((batch) => {
+                  const isExpanded = expandedBatchIds.has(batch._id);
+                  const statusMeta = STATUS_CONFIG[batch.status] || STATUS_CONFIG.FAILED;
+
+                  return (
+                    <React.Fragment key={batch._id}>
+                      <TableRow
+                        onClick={() => toggleBatchExpand(batch._id)}
+                        className={cn(
+                          'cursor-pointer transition-colors border-b border-zinc-200 dark:border-zinc-800 hover:bg-muted/40',
+                          isExpanded && 'bg-muted/20'
+                        )}
+                      >
+                        {/* 1. Date */}
+                        <TableCell className="py-2.5 px-3 font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          {batch.dateKey}
+                        </TableCell>
+
+                        {/* 2. Carrier (Plain text, no background/border pill) */}
+                        <TableCell className="py-2.5 px-3 whitespace-nowrap font-medium text-zinc-900 dark:text-zinc-100">
+                          {CARRIER_LABELS[batch.carrier] || batch.carrier}
+                        </TableCell>
+
+                        {/* 3. Status (Plain text, no background/border pill) */}
+                        <TableCell className="hidden sm:table-cell py-2.5 px-3 whitespace-nowrap">
+                          <span className={cn('text-[11px] uppercase', statusMeta.textClass)}>
+                            {statusMeta.label}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 text-white font-sans font-medium">{st.stationName}</td>
-                        <td className="py-3 px-4 text-slate-400 font-sans">{st.city || '—'}</td>
-                        <td className="py-3 px-4 text-slate-300">{st.managerEmail || '—'}</td>
-                        <td className="py-3 px-4 text-emerald-400">{st.managerWhatsAppPhone || '—'}</td>
-                        <td className="py-3 px-4 text-right font-sans">
-                          <div className="flex items-center justify-end gap-1.5">
+                        </TableCell>
+
+                        {/* 4. Station Code (hidden on mobile/small < md) */}
+                        <TableCell className="hidden md:table-cell py-2.5 px-3 whitespace-nowrap text-zinc-700 dark:text-zinc-300 font-medium">
+                          {batch.stationCode}
+                        </TableCell>
+
+                        {/* 5. Parcels Count (hidden on mobile/small < md) */}
+                        <TableCell className="hidden md:table-cell py-2.5 px-3 text-right whitespace-nowrap">
+                          <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                            {batch.parcelCount}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground ml-1">pkgs</span>
+                        </TableCell>
+
+                        {/* 6. Amount (hidden < lg) */}
+                        <TableCell className="hidden lg:table-cell py-2.5 px-3 text-right font-bold text-amber-500 dark:text-amber-400 tabular-nums whitespace-nowrap">
+                          PKR {batch.totalCOD.toLocaleString()}
+                        </TableCell>
+
+                        {/* 7. Recipient (hidden < xl) */}
+                        <TableCell className="hidden xl:table-cell py-2.5 px-3 text-[11px] text-muted-foreground max-w-[200px] truncate whitespace-nowrap">
+                          {batch.recipientEmail || 'Default Station Inbox'}
+                        </TableCell>
+
+                        {/* 8. Actions */}
+                        <TableCell className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => handleOpenStationModal(st)}
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                              onClick={(e) => handleDownload(batch._id, 'pdf', e)}
+                              className="px-2 py-0.5 text-[10px] font-bold uppercase border border-border bg-muted/60 hover:bg-muted text-zinc-800 dark:text-zinc-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Download PDF Run-Sheet"
+                            >
+                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                              <span>PDF</span>
+                            </button>
+
+                            <button
+                              onClick={(e) => handleDownload(batch._id, 'csv', e)}
+                              className="px-2 py-0.5 text-[10px] font-bold uppercase border border-border bg-muted/60 hover:bg-muted text-zinc-800 dark:text-zinc-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Download RFC-4180 CSV"
+                            >
+                              <FileSpreadsheet className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              <span>CSV</span>
+                            </button>
+
+                            <button
+                              onClick={(e) => toggleBatchExpand(batch._id, e)}
+                              className="p-1 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                              title={isExpanded ? 'Collapse details' : 'Expand details'}
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Accordion Expanded Detail Row */}
+                      {isExpanded && (
+                        <TableRow className="bg-muted/10 border-b border-zinc-200 dark:border-zinc-800">
+                          <TableCell colSpan={8} className="p-3 sm:p-4 font-mono text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* Left Column: Overview */}
+                              <div className="space-y-1.5 p-3 border border-border bg-white dark:bg-zinc-950">
+                                <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1">
+                                  Overview
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Batch ID:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono text-[11px] truncate max-w-[180px]">
+                                    {batch._id}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Carrier:</span>
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {CARRIER_LABELS[batch.carrier] || batch.carrier}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Station Code:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                                    {batch.stationCode}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Status:</span>
+                                  <span className={cn('text-[11px] uppercase font-bold', statusMeta.textClass)}>
+                                    {statusMeta.label}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Parcels Included:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                                    {batch.parcelCount}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Amount:</span>
+                                  <span className="font-bold text-amber-500 dark:text-amber-400">
+                                    PKR {batch.totalCOD.toLocaleString()}
+                                  </span>
+                                </div>
+                                {batch.error && (
+                                  <div className="pt-2 border-t border-border text-rose-600 dark:text-rose-400 text-[11px]">
+                                    <span className="font-bold">Error:</span> {batch.error}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right Column: Download */}
+                              <div className="space-y-2 p-3 border border-border bg-white dark:bg-zinc-950 flex flex-col justify-between">
+                                <div>
+                                  <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1 mb-2">
+                                    Download
+                                  </div>
+                                  <div className="flex flex-col gap-1.5">
+                                    <button
+                                      onClick={(e) => handleDownload(batch._id, 'pdf', e)}
+                                      className="w-full flex items-center justify-between px-2.5 py-1.5 border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-1.5">
+                                        <FileText className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                                        <span>PDF</span>
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground font-mono">.pdf</span>
+                                    </button>
+
+                                    <button
+                                      onClick={(e) => handleDownload(batch._id, 'csv', e)}
+                                      className="w-full flex items-center justify-between px-2.5 py-1.5 border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-1.5">
+                                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        <span>CSV</span>
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground font-mono">.csv</span>
+                                    </button>
+
+                                    {batch.driveUrl && (
+                                      <a
+                                        href={batch.driveUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors"
+                                      >
+                                        <span className="flex items-center gap-1.5">
+                                          <ExternalLink className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                          <span>Google Drive Archive</span>
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground font-mono">↗</span>
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 4. SUBVIEW 2: PENDING MANIFEST PARCELS TABLE                 */}
+      {/* ============================================================ */}
+      {activeSubView === 'pending' && (
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Pending Manifests Table"
+          className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black shadow-xs focus:outline-hidden"
+        >
+          <Table className="max-h-[600px]">
+            <TableHeader className="bg-muted/30 sticky top-0 z-10">
+              <TableRow>
+                {/* 1. Tracking Num (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Tracking Num
+                </TableHead>
+
+                {/* 2. Carrier (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Carrier
+                </TableHead>
+
+                {/* 3. Rescheduled Date (Visible on sm+) */}
+                <TableHead className="hidden sm:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Rescheduled Date
+                </TableHead>
+
+                {/* 4. Destination Station (Visible on md+) */}
+                <TableHead className="hidden md:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Station
+                </TableHead>
+
+                {/* 5. Amount (Visible on md+) */}
+                <TableHead className="hidden md:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap text-right">
+                  Amount
+                </TableHead>
+
+                {/* 6. Customer Phone (Visible on lg+) */}
+                <TableHead className="hidden lg:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Phone
+                </TableHead>
+
+                {/* 7. Status (Visible on xl+) */}
+                <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Status
+                </TableHead>
+
+                {/* 8. Action (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">
+                  Action
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-zinc-800 dark:text-zinc-200 font-mono">
+              {loadingPending && pendingParcels.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-zinc-400" />
+                    <span>Loading pending manifest parcels...</span>
+                  </TableCell>
+                </TableRow>
+              ) : filteredPending.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    <CheckCircle2 className="w-7 h-7 mx-auto mb-2 text-emerald-500 opacity-80" />
+                    <div className="font-semibold text-zinc-700 dark:text-zinc-300">All Parcels Manifested</div>
+                    <div className="text-[11px] mt-0.5">
+                      No rescheduled shipments currently awaiting station run-sheet dispatch.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredPending.map((parcel) => {
+                  const isExpanded = expandedPendingIds.has(parcel._id);
+
+                  return (
+                    <React.Fragment key={parcel._id}>
+                      <TableRow
+                        onClick={() => togglePendingExpand(parcel._id)}
+                        className={cn(
+                          'cursor-pointer transition-colors border-b border-zinc-200 dark:border-zinc-800 hover:bg-muted/40',
+                          isExpanded && 'bg-muted/20'
+                        )}
+                      >
+                        {/* 1. Tracking Num */}
+                        <TableCell className="py-2.5 px-3 font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          {parcel.trackingNumber}
+                        </TableCell>
+
+                        {/* 2. Carrier (Plain text, no background/border pill) */}
+                        <TableCell className="py-2.5 px-3 whitespace-nowrap font-medium text-zinc-900 dark:text-zinc-100">
+                          {CARRIER_LABELS[parcel.carrier] || parcel.carrier}
+                        </TableCell>
+
+                        {/* 3. Rescheduled Date (hidden on mobile < sm) */}
+                        <TableCell className="hidden sm:table-cell py-2.5 px-3 whitespace-nowrap">
+                          {parcel.rescheduledDate ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-zinc-800 dark:text-zinc-200">
+                              <Calendar className="w-3 h-3 text-cyan-500" />
+                              <span>{parcel.rescheduledDate}</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Next 07:30</span>
+                          )}
+                        </TableCell>
+
+                        {/* 4. Station (hidden < md) */}
+                        <TableCell className="hidden md:table-cell py-2.5 px-3 whitespace-nowrap font-medium text-zinc-700 dark:text-zinc-300">
+                          {parcel.destinationStationCode || 'MAIN'}
+                        </TableCell>
+
+                        {/* 5. Amount (hidden < md) */}
+                        <TableCell className="hidden md:table-cell py-2.5 px-3 text-right font-bold text-amber-500 dark:text-amber-400 tabular-nums whitespace-nowrap">
+                          PKR {parcel.orderValueCOD?.toLocaleString() ?? 0}
+                        </TableCell>
+
+                        {/* 6. Customer Phone (hidden < lg) */}
+                        <TableCell className="hidden lg:table-cell py-2.5 px-3 text-[11px] text-muted-foreground whitespace-nowrap font-mono">
+                          {parcel.customerPhonePlain || parcel.customerPhoneMasked}
+                        </TableCell>
+
+                        {/* 7. Status (hidden < xl) (Plain text, no background/border pill) */}
+                        <TableCell className="hidden xl:table-cell py-2.5 px-3 whitespace-nowrap font-bold text-[11px] uppercase text-amber-600 dark:text-amber-400">
+                          {parcel.status}
+                        </TableCell>
+
+                        {/* 8. Action (Always visible on mobile & desktop) */}
+                        <TableCell className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <a
+                              href={parcel.escalationLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-0.5 text-[10px] font-bold uppercase border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors inline-flex items-center gap-1"
+                              title="WhatsApp Station Manager (wa.me)"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                              <span>wa.me</span>
+                            </a>
+
+                            <button
+                              onClick={(e) => handleCopyLink(parcel.escalationLink, parcel._id, e)}
+                              className="p-1 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                              title="Copy WhatsApp deep-link"
+                            >
+                              {copiedLink === parcel._id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            <button
+                              onClick={(e) => togglePendingExpand(parcel._id, e)}
+                              className="p-1 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                              title={isExpanded ? 'Collapse details' : 'Expand details'}
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Accordion Expanded Detail Row for Pending Parcel */}
+                      {isExpanded && (
+                        <TableRow className="bg-muted/10 border-b border-zinc-200 dark:border-zinc-800">
+                          <TableCell colSpan={8} className="p-3 sm:p-4 font-mono text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {/* Left Column: Delivery & Hub Details */}
+                              <div className="space-y-1.5 p-3 border border-border bg-white dark:bg-zinc-950">
+                                <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1">
+                                  Parcel Details
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Tracking Number:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+                                    {parcel.trackingNumber}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Carrier:</span>
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {CARRIER_LABELS[parcel.carrier] || parcel.carrier}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Destination Hub:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                                    {parcel.destinationStationCode || 'MAIN'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Rescheduled Date:</span>
+                                  <span className="font-semibold text-cyan-600 dark:text-cyan-400">
+                                    {parcel.rescheduledDate || 'Next 07:30 PKT Dispatch'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Amount:</span>
+                                  <span className="font-bold text-amber-500 dark:text-amber-400">
+                                    PKR {parcel.orderValueCOD?.toLocaleString() ?? 0}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Center Column: Customer & Location */}
+                              <div className="space-y-1.5 p-3 border border-border bg-white dark:bg-zinc-950">
+                                <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1">
+                                  Customer & Geolocation
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Customer Phone:</span>
+                                  <span className="font-mono text-zinc-900 dark:text-zinc-100">
+                                    {parcel.customerPhonePlain || parcel.customerPhoneMasked}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">GPS Location:</span>
+                                  {parcel.customerCoordinates ? (
+                                    <a
+                                      href={`https://maps.google.com/?q=${parcel.customerCoordinates.lat},${parcel.customerCoordinates.lng}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 hover:underline font-mono text-[11px]"
+                                    >
+                                      <MapPin className="w-3 h-3 text-rose-500" />
+                                      <span>
+                                        {parcel.customerCoordinates.lat.toFixed(4)}, {parcel.customerCoordinates.lng.toFixed(4)}
+                                      </span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted-foreground text-[10px]">No GPS Coordinates</span>
+                                  )}
+                                </div>
+                                {parcel.stationContact && (
+                                  <div className="pt-2 border-t border-border space-y-1">
+                                    <div className="text-[10px] text-muted-foreground font-bold">
+                                      Station Manager Contact:
+                                    </div>
+                                    <div className="text-zinc-800 dark:text-zinc-200 text-[11px]">
+                                      {parcel.stationContact.managerWhatsAppPhone || parcel.stationContact.managerEmail || 'Unassigned'}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right Column: Tier 3 Escalation wa.me Action */}
+                              <div className="space-y-2 p-3 border border-border bg-white dark:bg-zinc-950 flex flex-col justify-between">
+                                <div>
+                                  <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1 mb-2">
+                                    Tier 3 Station Manager Escalation
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground mb-3">
+                                    Deep-link directly to the courier station manager on WhatsApp with pre-filled reschedule instructions.
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={parcel.escalationLink}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex-1 py-1.5 px-3 border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-xs font-bold text-center inline-flex items-center justify-center gap-1.5 hover:opacity-85 transition-opacity"
+                                    >
+                                      <ArrowUpRight className="w-3.5 h-3.5" />
+                                      <span>Open WhatsApp (wa.me)</span>
+                                    </a>
+                                    <button
+                                      onClick={(e) => handleCopyLink(parcel.escalationLink, parcel._id, e)}
+                                      className="p-1.5 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                                      title="Copy deep-link"
+                                    >
+                                      {copiedLink === parcel._id ? (
+                                        <Check className="w-4 h-4 text-emerald-500" />
+                                      ) : (
+                                        <Copy className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground font-mono pt-2 border-t border-border">
+                                  Scheduled for automated compilation at 07:30 PKT
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 5. SUBVIEW 3: COURIER STATION DIRECTORY TABLE                */}
+      {/* ============================================================ */}
+      {activeSubView === 'stations' && (
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Station Directory Table"
+          className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black shadow-xs focus:outline-hidden"
+        >
+          <Table className="max-h-[600px]">
+            <TableHeader className="bg-muted/30 sticky top-0 z-10">
+              <TableRow>
+                {/* 1. Carrier (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Carrier
+                </TableHead>
+
+                {/* 2. Station Code (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Station Code
+                </TableHead>
+
+                {/* 3. City (Visible on sm+) */}
+                <TableHead className="hidden sm:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  City
+                </TableHead>
+
+                {/* 4. Station Name (Visible on md+) */}
+                <TableHead className="hidden md:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Station Name
+                </TableHead>
+
+                {/* 5. Manager WhatsApp (Visible on lg+) */}
+                <TableHead className="hidden lg:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Manager WhatsApp
+                </TableHead>
+
+                {/* 6. Manager Email (Visible on xl+) */}
+                <TableHead className="hidden xl:table-cell py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Manager Email
+                </TableHead>
+
+                {/* 7. Actions (Always visible on mobile & desktop) */}
+                <TableHead className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-zinc-800 dark:text-zinc-200 font-mono">
+              {loadingStations && stations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-zinc-400" />
+                    <span>Loading station directory...</span>
+                  </TableCell>
+                </TableRow>
+              ) : filteredStations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    <Building2 className="w-7 h-7 mx-auto mb-2 opacity-40 text-zinc-400" />
+                    <div className="font-semibold text-zinc-700 dark:text-zinc-300">No carrier stations configured</div>
+                    <div className="text-[11px] mt-0.5">
+                      Add courier hub codes and manager emails/WhatsApp to automate daily run-sheet routing.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredStations.map((st) => {
+                  const isExpanded = expandedStationIds.has(st._id);
+
+                  return (
+                    <React.Fragment key={st._id}>
+                      <TableRow
+                        onClick={() => toggleStationExpand(st._id)}
+                        className={cn(
+                          'cursor-pointer transition-colors border-b border-zinc-200 dark:border-zinc-800 hover:bg-muted/40',
+                          isExpanded && 'bg-muted/20'
+                        )}
+                      >
+                        {/* 1. Carrier (Plain text, no background/border pill) */}
+                        <TableCell className="py-2.5 px-3 whitespace-nowrap font-medium text-zinc-900 dark:text-zinc-100">
+                          {CARRIER_LABELS[st.carrier] || st.carrier}
+                        </TableCell>
+
+                        {/* 2. Station Code */}
+                        <TableCell className="py-2.5 px-3 font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          {st.stationCode}
+                        </TableCell>
+
+                        {/* 3. City (hidden on mobile < sm) */}
+                        <TableCell className="hidden sm:table-cell py-2.5 px-3 whitespace-nowrap text-zinc-700 dark:text-zinc-300 font-medium">
+                          {st.city || '—'}
+                        </TableCell>
+
+                        {/* 4. Station Name (hidden < md) */}
+                        <TableCell className="hidden md:table-cell py-2.5 px-3 whitespace-nowrap font-medium text-zinc-900 dark:text-zinc-100">
+                          {st.stationName}
+                        </TableCell>
+
+                        {/* 5. Manager WhatsApp (hidden < lg) */}
+                        <TableCell className="hidden lg:table-cell py-2.5 px-3 whitespace-nowrap text-emerald-600 dark:text-emerald-400 font-mono">
+                          {st.managerWhatsAppPhone || '—'}
+                        </TableCell>
+
+                        {/* 6. Manager Email (hidden < xl) */}
+                        <TableCell className="hidden xl:table-cell py-2.5 px-3 whitespace-nowrap text-muted-foreground font-mono text-[11px]">
+                          {st.managerEmail || '—'}
+                        </TableCell>
+
+                        {/* 7. Actions (Always visible on mobile & desktop) */}
+                        <TableCell className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => handleOpenStationDrawer(st, e)}
+                              className="p-1 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
                               title="Edit Station"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
+
                             <button
-                              onClick={() => handleDeleteStation(st._id)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all"
+                              onClick={(e) => handleDeleteStation(st._id, e)}
+                              className="p-1 border border-rose-300 dark:border-rose-900 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 cursor-pointer"
                               title="Delete Station"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+
+                            <button
+                              onClick={(e) => toggleStationExpand(st._id, e)}
+                              className="p-1 border border-border bg-muted/40 hover:bg-muted text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                              title={isExpanded ? 'Collapse details' : 'Expand details'}
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Accordion Expanded Detail Row for Station */}
+                      {isExpanded && (
+                        <TableRow className="bg-muted/10 border-b border-zinc-200 dark:border-zinc-800">
+                          <TableCell colSpan={7} className="p-3 sm:p-4 font-mono text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* Station Info */}
+                              <div className="space-y-1.5 p-3 border border-border bg-white dark:bg-zinc-950">
+                                <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1">
+                                  Station Information
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Carrier:</span>
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {CARRIER_LABELS[st.carrier] || st.carrier}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Station Code:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100">{st.stationCode}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Station Name:</span>
+                                  <span className="font-bold text-zinc-900 dark:text-zinc-100">{st.stationName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">City:</span>
+                                  <span className="text-zinc-800 dark:text-zinc-200">{st.city || 'Unspecified'}</span>
+                                </div>
+                              </div>
+
+                              {/* Station Manager Contact & Quick Actions */}
+                              <div className="space-y-2 p-3 border border-border bg-white dark:bg-zinc-950 flex flex-col justify-between">
+                                <div>
+                                  <div className="text-[10px] uppercase font-bold text-muted-foreground border-b border-border pb-1 mb-2">
+                                    Manager Escalation Route
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <Mail className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span className="text-zinc-800 dark:text-zinc-200 font-mono text-[11px]">
+                                        {st.managerEmail || 'No Email Registered'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
+                                        {st.managerWhatsAppPhone || 'No WhatsApp Registered'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-border flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={(e) => handleOpenStationDrawer(st, e)}
+                                    className="px-3 py-1 border border-border bg-muted/60 hover:bg-muted text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    <span>Edit Contact</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleDeleteStation(st._id, e)}
+                                    className="px-3 py-1 border border-rose-300 dark:border-rose-900 bg-rose-500/10 hover:bg-rose-500/20 text-xs font-semibold text-rose-600 dark:text-rose-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
       )}
 
-      {/* Compile Run-Sheets Now Modal */}
-      {compileModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-5 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between border-b border-white/10 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-indigo-400" />
-                  <span>Compile Station Run-Sheets</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Execute immediate compilation of all parcels flagged with needsStationManifest: true.
-                </p>
-              </div>
-              <button
-                onClick={() => setCompileModalOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Carrier Filter (Optional)</label>
-                <select
-                  value={compileCarrier}
-                  onChange={(e) => setCompileCarrier(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">All Carriers</option>
-                  <option value="POSTEX">POSTEX</option>
-                  <option value="TRAX">TRAX</option>
-                  <option value="LEOPARDS">LEOPARDS</option>
-                  <option value="TCS">TCS</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Station Code (Optional)</label>
-                <input
-                  type="text"
-                  value={compileStationCode}
-                  onChange={(e) => setCompileStationCode(e.target.value)}
-                  placeholder="Leave empty for all destination stations"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setCompileModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleTriggerCompilation}
-                disabled={compiling}
-                className="px-4 py-2 rounded-xl bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-2"
-              >
-                <Zap className={`w-3.5 h-3.5 ${compiling ? 'animate-spin' : ''}`} />
-                <span>{compiling ? 'Compiling Run-Sheets...' : 'Compile & Dispatch'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add / Edit Station Modal */}
-      {stationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <form
-            onSubmit={handleSaveStation}
-            className="w-full max-w-lg rounded-2xl bg-slate-900 border border-white/10 p-5 shadow-2xl space-y-4"
+      {/* ============================================================ */}
+      {/* 6. SLIDE-OVER RIGHT DRAWER: COMPILE RUN-SHEETS NOW           */}
+      {/* ============================================================ */}
+      {compileDrawerOpen && (
+        <div
+          className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/60 backdrop-blur-md animate-fade-in"
+          onClick={() => setCompileDrawerOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg h-full bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 flex flex-col text-zinc-900 dark:text-zinc-100 shadow-2xl overflow-hidden font-mono text-xs"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Compile Station Run-Sheets"
           >
-            <div className="flex items-start justify-between border-b border-white/10 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-cyan-400" />
-                  <span>{editingStation ? 'Edit Carrier Station' : 'Add Carrier Station'}</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Station contact for automated PDF/CSV run-sheets and WhatsApp escalations.
+            {/* Drawer Header */}
+            <div className="px-5 py-3.5 border-b border-border bg-zinc-50 dark:bg-zinc-900/90 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="font-bold text-sm uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                  Compile Station Run-Sheets
+                </span>
+                <span className="text-[10px] text-zinc-500 bg-muted px-2 py-0.5 border border-border">
+                  IMMEDIATE
+                </span>
+              </div>
+              <button
+                onClick={() => setCompileDrawerOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                aria-label="Close drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Drawer Form Body */}
+            <form onSubmit={handleTriggerCompilation} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Trigger an immediate compilation pass across all shipments flagged with{' '}
+                  <code className="text-zinc-900 dark:text-zinc-100 font-bold">needsStationManifest: true</code>.
+                  Compiled PDF 1.4 run-sheets and RFC-4180 formula-sanitized CSVs will be dispatched to station contacts.
                 </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStationModalOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Carrier *</label>
-                <select
-                  value={stationCarrier}
-                  onChange={(e) => setStationCarrier(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    Carrier Filter (Optional)
+                  </label>
+                  <select
+                    value={compileCarrier}
+                    onChange={(e) => setCompileCarrier(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 dark:[color-scheme:dark]"
+                  >
+                    <option value="">All Carriers (Aggregate All Pending)</option>
+                    <option value="POSTEX">POSTEX Only</option>
+                    <option value="TRAX">TRAX Only</option>
+                    <option value="LEOPARDS">LEOPARDS Only</option>
+                    <option value="TCS">TCS Only</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    Destination Station Code (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={compileStationCode}
+                    onChange={(e) => setCompileStationCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. KHI-01, LHE-MAIN, ISB"
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-mono text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 uppercase"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Leave blank to compile all destination stations concurrently.
+                  </span>
+                </div>
+
+                <div className="p-3 border border-border bg-muted/20 space-y-1">
+                  <div className="font-bold text-zinc-900 dark:text-zinc-100 text-[11px] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Automated BullMQ Worker</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    The scheduled queue automatically fires daily at 07:30 PKT. Running an immediate compile will claim
+                    pending parcels and dispatch today's station batch early.
+                  </p>
+                </div>
+              </div>
+
+              {/* Drawer Footer Actions */}
+              <div className="p-4 border-t border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCompileDrawerOpen(false)}
+                  className="px-4 py-2 border border-border bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 text-xs font-semibold hover:bg-muted transition-colors cursor-pointer"
                 >
-                  <option value="POSTEX">POSTEX</option>
-                  <option value="TRAX">TRAX</option>
-                  <option value="LEOPARDS">LEOPARDS</option>
-                  <option value="TCS">TCS</option>
-                </select>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={compiling}
+                  className="px-4 py-2 border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-xs font-bold hover:opacity-85 transition-opacity disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Zap className={cn('w-3.5 h-3.5', compiling && 'animate-spin')} />
+                  <span>{compiling ? 'Compiling Run-Sheets...' : 'Compile Run-Sheets Now'}</span>
+                </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Station Code *</label>
-                <input
-                  type="text"
-                  required
-                  value={stationCode}
-                  onChange={(e) => setStationCode(e.target.value)}
-                  placeholder="e.g. KHI-01 or ISB-CENTRAL"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
-                />
+      {/* ============================================================ */}
+      {/* 7. SLIDE-OVER RIGHT DRAWER: ADD / EDIT STATION CONTACT       */}
+      {/* ============================================================ */}
+      {stationDrawerOpen && (
+        <div
+          className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/60 backdrop-blur-md animate-fade-in"
+          onClick={() => setStationDrawerOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg h-full bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 flex flex-col text-zinc-900 dark:text-zinc-100 shadow-2xl overflow-hidden font-mono text-xs"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingStation ? 'Edit Station Contact' : 'Add Station Contact'}
+          >
+            {/* Drawer Header */}
+            <div className="px-5 py-3.5 border-b border-border bg-zinc-50 dark:bg-zinc-900/90 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-bold text-sm uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                  {editingStation ? 'Edit Station Contact' : 'Add Station Contact'}
+                </span>
+                <span className="text-[10px] text-zinc-500 bg-muted px-2 py-0.5 border border-border">
+                  DIRECTORY
+                </span>
               </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Station Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={stationName}
-                  onChange={(e) => setStationName(e.target.value)}
-                  placeholder="e.g. Karachi Clifton Hub"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">City</label>
-                <input
-                  type="text"
-                  value={stationCity}
-                  onChange={(e) => setStationCity(e.target.value)}
-                  placeholder="e.g. Karachi"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Manager Email</label>
-                <input
-                  type="email"
-                  value={managerEmail}
-                  onChange={(e) => setManagerEmail(e.target.value)}
-                  placeholder="hubmanager@carrier.com"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Manager WhatsApp Phone</label>
-                <input
-                  type="text"
-                  value={managerWhatsAppPhone}
-                  onChange={(e) => setManagerWhatsAppPhone(e.target.value)}
-                  placeholder="+923001234567 or 03001234567"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
               <button
-                type="button"
-                onClick={() => setStationModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
+                onClick={() => setStationDrawerOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                aria-label="Close drawer"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md"
-              >
-                Save Station Contact
+                <X className="w-4 h-4" />
               </button>
             </div>
-          </form>
+
+            {/* Drawer Form Body */}
+            <form onSubmit={handleSaveStation} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Destination station contacts receive daily 07:30 PKT run-sheets and serve as the target for Tier 3
+                  customer escalation routing on WhatsApp.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                      Carrier *
+                    </label>
+                    <select
+                      value={stationCarrier}
+                      onChange={(e) => setStationCarrier(e.target.value as any)}
+                      className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 dark:[color-scheme:dark]"
+                    >
+                      <option value="POSTEX">PostEx</option>
+                      <option value="TRAX">Trax</option>
+                      <option value="LEOPARDS">Leopards</option>
+                      <option value="TCS">TCS</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                      Station Code *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={stationCode}
+                      onChange={(e) => setStationCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. KHI-NORTH, LHE-02"
+                      className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-mono text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    Station Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={stationName}
+                    onChange={(e) => setStationName(e.target.value)}
+                    placeholder="e.g. Karachi North Nazimabad Hub"
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    City (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={stationCity}
+                    onChange={(e) => setStationCity(e.target.value)}
+                    placeholder="e.g. Karachi, Lahore, Rawalpindi"
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    Manager Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={managerEmail}
+                    onChange={(e) => setManagerEmail(e.target.value)}
+                    placeholder="hub.manager@carrier.pk"
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-mono text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px]">
+                    Manager WhatsApp Phone (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={managerWhatsAppPhone}
+                    onChange={(e) => setManagerWhatsAppPhone(e.target.value)}
+                    placeholder="+923001234567 or 03001234567"
+                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-mono text-xs focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Used to generate direct WhatsApp escalation links (wa.me) for fast delivery resolution.
+                  </span>
+                </div>
+              </div>
+
+              {/* Drawer Footer Actions */}
+              <div className="p-4 border-t border-border bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setStationDrawerOpen(false)}
+                  className="px-4 py-2 border border-border bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 text-xs font-semibold hover:bg-muted transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingStation}
+                  className="px-4 py-2 border border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-xs font-bold hover:opacity-85 transition-opacity disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className={cn('w-3.5 h-3.5', savingStation && 'animate-spin')} />
+                  <span>{savingStation ? 'Saving Contact...' : 'Save Station Contact'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

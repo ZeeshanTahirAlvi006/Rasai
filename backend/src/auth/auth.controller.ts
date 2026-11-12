@@ -22,7 +22,7 @@ const setRefreshTokenCookie = (_: Request, res: Response, token: string) => {
     res.cookie("refreshToken", token, {
         httpOnly: true,
         secure: config.nodeEnv === "production",
-        sameSite: "strict",
+        sameSite: config.nodeEnv === "production" ? "strict" : "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000
     })
 }
@@ -49,12 +49,12 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
         error: result?.error
     }
     return res.status(result?.status as number).json(response)
-
 })
 
 //refresh access token
 export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
-    const result = await refreshAccessTokenService(req.cookies?.refreshToken as string)
+    const rawToken = (req.cookies?.refreshToken || req.body?.refreshToken) as string | undefined;
+    const result = await refreshAccessTokenService(rawToken)
     setRefreshTokenCookie(req, res, result?.data?.refreshToken);
     const response = {
         success: result?.success,
@@ -68,7 +68,8 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
 })
 //logout
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-    const result = await logoutService(req.cookies?.refreshToken as string)
+    const rawToken = (req.cookies?.refreshToken || req.body?.refreshToken) as string | undefined;
+    const result = await logoutService(rawToken as string)
     res.clearCookie("refreshToken")
     return res.status(result?.status as number).json(result)
 })
@@ -93,13 +94,13 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 })
 //logout all
 export const logoutAll = asyncHandler(async (req: Request, res: Response) => {
-    const result = await logoutAllService(req.cookies?.refreshToken as string)
+    const rawToken = (req.cookies?.refreshToken || req.body?.refreshToken) as string | undefined;
+    const result = await logoutAllService(rawToken as string)
     res.clearCookie("refreshToken")
     return res.status(result?.status as number).json(result)
 })
 //verify email 
 export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
-
     const { otp, email } = req.body
     const result = await verifyEmailService(otp, email)
     return res.status(result?.status as number).json(result)
@@ -125,7 +126,6 @@ export const verifyResetPasswordOtp = asyncHandler(async (req: Request, res: Res
 // reset pw
 export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     const { resetToken, password } = req.body
-
     const result = await resetPasswordService(resetToken, password)
     res.status(result?.status as number).json(result)
 })

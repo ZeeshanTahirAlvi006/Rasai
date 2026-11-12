@@ -51,7 +51,9 @@ export const QuickAuthModal: React.FC<QuickAuthModalProps> = ({ isOpen, onClose 
       toast.success('Logged in successfully!');
       onClose();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'Login failed');
+      const rawMsg = err.response?.data?.message || err.message || 'Login failed';
+      const msg = typeof rawMsg === 'string' ? rawMsg : rawMsg?.message || 'Login failed';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

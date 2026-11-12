@@ -5,8 +5,14 @@ import { ManifestBatch } from './ManifestBatch';
 import { Shipment, type IShipment } from '../shipment/shipment.model';
 import { CarrierStation, type ICarrierStation } from '../models/CarrierStation';
 import { compileAndSendManifests, type CompileManifestsSummary } from './manifest.worker';
-import { getManifestArtifact } from './manifest.delivery';
-import { buildWhatsAppEscalationLink } from './manifest.generator';
+import { getManifestArtifact, saveManifestArtifact } from './manifest.delivery';
+import {
+  buildWhatsAppEscalationLink,
+  generateRunSheetPdfBuffer,
+  generateRunSheetCsvBuffer,
+  type ManifestMetadata,
+  type ManifestParcelRow,
+} from './manifest.generator';
 import { decryptPhone, maskPhone } from '../utils/phone';
 import { AppError } from '../middleware/error';
 import type { Carrier } from '../types';
@@ -223,7 +229,7 @@ export async function getManifestDownloadBufferService(
     _id: new Types.ObjectId(id),
     merchantId,
   })
-    .select('carrier stationCode dateKey pdfStorageKey csvStorageKey')
+    .select('carrier stationCode dateKey pdfStorageKey csvStorageKey shipmentIds totalCOD parcelCount')
     .lean()
     .exec();
 
@@ -232,13 +238,72 @@ export async function getManifestDownloadBufferService(
   }
 
   const storageKey = format === 'pdf' ? batch.pdfStorageKey : batch.csvStorageKey;
-  if (!storageKey) {
-    throw new AppError(404, `No ${format.toUpperCase()} artifact key recorded for this manifest`, 'artifact_not_found');
-  }
+  let artifact = storageKey ? getManifestArtifact(storageKey) : null;
 
-  const artifact = getManifestArtifact(storageKey);
   if (!artifact) {
-    throw new AppError(404, `Manifest ${format.toUpperCase()} file not found in storage`, 'artifact_missing');
+    // Regenerate on-demand if artifact is missing from storage/memory (B3-BUG-03 resilience)
+    const shipmentIds = (batch.shipmentIds || []).filter(Boolean);
+    const shipments = shipmentIds.length > 0
+      ? await Shipment.find({
+          _id: { $in: shipmentIds },
+          merchantId,
+        })
+          .select('trackingNumber carrier destinationStationCode status rescheduledDate orderValueCOD customerPhone customerCoordinates')
+          .lean()
+          .exec()
+      : [];
+
+    const parcelRows: ManifestParcelRow[] = shipments.map((p) => {
+      let phonePlain = 'N/A';
+      let phoneMasked = '****';
+      if (p.customerPhone) {
+        try {
+          phonePlain = decryptPhone(p.customerPhone);
+          phoneMasked = maskPhone(phonePlain);
+        } catch {
+          phonePlain = 'Decryption failed';
+        }
+      }
+      return {
+        trackingNumber: p.trackingNumber,
+        carrier: p.carrier,
+        stationCode: p.destinationStationCode || batch.stationCode,
+        status: p.status,
+        rescheduledDate: p.rescheduledDate,
+        orderValueCOD: p.orderValueCOD || 0,
+        customerPhonePlain: phonePlain,
+        customerPhoneMasked: phoneMasked,
+        coordinates: p.customerCoordinates,
+      };
+    });
+
+    const meta: ManifestMetadata = {
+      stationCode: batch.stationCode,
+      carrier: batch.carrier,
+      dateKey: batch.dateKey,
+      totalParcels: parcelRows.length || batch.parcelCount || 0,
+      totalCOD: batch.totalCOD || parcelRows.reduce((sum, r) => sum + r.orderValueCOD, 0),
+    };
+
+    const pdfBuffer = generateRunSheetPdfBuffer(meta, parcelRows);
+    const csvBuffer = generateRunSheetCsvBuffer(meta, parcelRows);
+
+    const generatedPdfKey = batch.pdfStorageKey || `manifests/${batch.carrier}/${batch.dateKey}/${batch.stationCode}_${batch._id}.pdf`;
+    const generatedCsvKey = batch.csvStorageKey || `manifests/${batch.carrier}/${batch.dateKey}/${batch.stationCode}_${batch._id}.csv`;
+
+    saveManifestArtifact(generatedPdfKey, pdfBuffer, 'application/pdf');
+    saveManifestArtifact(generatedCsvKey, csvBuffer, 'text/csv');
+
+    if (!batch.pdfStorageKey || !batch.csvStorageKey) {
+      await ManifestBatch.updateOne(
+        { _id: batch._id },
+        { $set: { pdfStorageKey: generatedPdfKey, csvStorageKey: generatedCsvKey } },
+      );
+    }
+
+    artifact = format === 'pdf'
+      ? { buffer: pdfBuffer, contentType: 'application/pdf' }
+      : { buffer: csvBuffer, contentType: 'text/csv' };
   }
 
   const filename = `run-sheet-${batch.carrier}-${batch.stationCode}-${batch.dateKey}.${format}`;

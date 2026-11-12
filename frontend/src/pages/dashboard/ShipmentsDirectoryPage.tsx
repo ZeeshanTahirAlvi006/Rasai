@@ -74,8 +74,8 @@ export const ShipmentsDirectoryPage: React.FC = () => {
       }
       setNextCursor(res.envelope.data.nextCursor);
     } catch (err: any) {
-      if (err.status !== 401) {
-        toast.error(err.message || 'Failed to fetch shipments');
+      if (err.status !== 401 && err.response?.status !== 401) {
+        toast.error(typeof err?.message === 'string' ? err.message : 'Failed to fetch shipments');
       }
     } finally {
       setLoading(false);

@@ -19,6 +19,7 @@
 }
 
 :root {
+  color-scheme: light dark;
   font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --border: #e4e4e7;
   --muted: #f4f4f5;
@@ -73,9 +74,31 @@ td {
 
 .dark,
 [data-theme="black"] {
+  color-scheme: dark;
   --border: #27272a;
   --muted: #18181b;
   --muted-foreground: #a1a1aa;
+}
+
+.light,
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Force Native Select Dropdowns and Options to Respect Pure Black Theme */
+.dark select,
+[data-theme="black"] select,
+.dark option,
+[data-theme="black"] option {
+  background-color: #000000 !important;
+  color: #f4f4f5 !important;
+  color-scheme: dark !important;
+}
+
+.dark select:focus,
+[data-theme="black"] select:focus {
+  background-color: #000000 !important;
+  color: #ffffff !important;
 }
 
 html {

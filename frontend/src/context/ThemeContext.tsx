@@ -28,10 +28,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.classList.add('dark');
       root.classList.remove('light');
       root.setAttribute('data-theme', 'black');
+      root.style.colorScheme = 'dark';
     } else {
       root.classList.add('light');
       root.classList.remove('dark');
       root.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
     }
     localStorage.setItem('ndr-theme', theme);
   }, [theme]);

@@ -1,6 +1,10 @@
+// src/pages/LandingPage.tsx
+// Public story landing page orchestrating HeroSection, 5-scene MovieTheater, and AboutUsSection.
+
 import React, { useEffect } from 'react';
 import HeroSection from '../components/landing/HeroSection';
 import MovieTheater from '../components/landing/movie/MovieTheater';
+import AboutUsSection from '../components/landing/AboutUsSection';
 import CustomScrollbar from '../components/landing/CustomScrollbar';
 import { useTheme } from '../context/ThemeContext';
 
@@ -43,8 +47,11 @@ export const LandingPage: React.FC = () => {
       {/* Target anchor for hero scroll down */}
       <div id="next" className="relative -top-2" />
 
-      {/* Full-Screen Pure Scroll-Driven Cinematic Story (Scenes 1 & 2) */}
+      {/* Full-Screen Pure Scroll-Driven Cinematic Story (Scenes 1–5 + Cloud Bookend) */}
       <MovieTheater />
+
+      {/* Next Section Emerging as Clouds Close: About Us */}
+      <AboutUsSection />
     </main>
   );
 };

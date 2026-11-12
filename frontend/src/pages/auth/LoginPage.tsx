@@ -64,11 +64,17 @@ export const LoginPage: React.FC = () => {
       const from = (location.state as any)?.from || '/dashboard';
       navigate(from, { replace: true });
     } catch (err: any) {
-      const serverMsg =
+      const rawMsg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
-        err?.message ||
-        'Authentication failed';
+        err?.message;
+
+      const serverMsg =
+        typeof rawMsg === 'string'
+          ? rawMsg
+          : typeof rawMsg === 'object' && rawMsg?.message
+          ? String(rawMsg.message)
+          : 'Authentication failed';
 
       if (serverMsg.toLowerCase().includes('not verified')) {
         setUnverifiedEmail(cleanUsername);
@@ -147,7 +153,7 @@ export const LoginPage: React.FC = () => {
           <div className="field uiverse-field">
             <AtIcon className="input-icon uiverse-input-icon" />
             <input
-              autoComplete="off"
+              autoComplete="username"
               placeholder="Username or Email"
               className="input-field uiverse-input-field"
               type="text"
@@ -161,6 +167,7 @@ export const LoginPage: React.FC = () => {
           <div className="field uiverse-field">
             <LockIcon className="input-icon uiverse-input-icon" />
             <input
+              autoComplete="current-password"
               placeholder="Password"
               className="input-field uiverse-input-field"
               type={showPassword ? 'text' : 'password'}

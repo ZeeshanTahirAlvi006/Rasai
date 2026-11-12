@@ -164,7 +164,10 @@ export const getMeService = async (token: string) => {
 }
 
 // refreshAccess token service
-export const refreshAccessTokenService = async (refreshToken: string) => {
+export const refreshAccessTokenService = async (refreshToken?: string) => {
+    if (!refreshToken || typeof refreshToken !== 'string') {
+        throw new AppError(401, "No refresh token provided", "missing_token");
+    }
     const token = refreshToken.trim();
     const decoded = jwt.verify(token as string, config.jwtSecret as string) as unknown as customJwtPayLoad;
     const id = decoded.id;

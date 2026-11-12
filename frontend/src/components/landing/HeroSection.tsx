@@ -1,3 +1,6 @@
+// src/components/landing/HeroSection.tsx
+// Full-screen hero section with 3D starfield, kinetic Rasai choreography, and live Pakistan clock.
+
 import React, { useState, useEffect } from 'react';
 import StarfieldCanvas from './StarfieldCanvas';
 import RasaiChoreography from './RasaiChoreography';
@@ -118,7 +121,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             items={[
               { label: 'Home', href: '#' },
               { label: 'Contact', href: '#contact' },
-              { label: 'About', href: '#next' },
+              { label: 'About', href: '#about-us' },
               { label: 'FAQ', href: '#faq' },
             ]}
           />
@@ -206,7 +209,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {[
             { label: 'Home', href: '#' },
             { label: 'Contact', href: '#contact' },
-            { label: 'About', href: '#next' },
+            { label: 'About', href: '#about-us' },
             { label: 'FAQ', href: '#faq' },
           ].map((link) => (
             <a

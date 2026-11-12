@@ -10,6 +10,7 @@ import { closeSharedRedisClient } from './config/redis.js';
 import { buildCorsOptions } from './config/cors.js';
 import authRouter from './auth/auth.router.js';
 import { errorHandler } from './middleware/error.js';
+import { cookieParserMiddleware } from './middleware/cookieParser.js';
 import carrierRouter from '../src/healthCarrier/carrierHealth.router.js';
 import shipmentRouter from './shipment/shipment.router.js';
 import shipmentEventRouter from './shipmentEvent/ShipmentEvent.router.js';
@@ -33,6 +34,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors(buildCorsOptions(config.corsOrigins, config.isProd)));
+app.use(cookieParserMiddleware);
 // Preserve raw byte stream for Meta webhook HMAC-SHA256 signature verification (B3-RC-06)
 app.use(
   express.json({

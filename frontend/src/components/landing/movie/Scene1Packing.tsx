@@ -1,8 +1,12 @@
+// src/components/landing/movie/Scene1Packing.tsx
+// Master unified sticky scroll stage orchestrating Scenes 1–5 and the volumetric cloud bookend transitions.
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { soundEngine } from '../cinema/SoundEngine';
 import TapeDispenserGun from './TapeDispenserGun';
 import Scene2CityRush, { Scene2Handle } from './Scene2CityRush';
 import Scene3Doorstep, { Scene3Handle } from './Scene3Doorstep';
+import Scene5DoorstepHandover, { Scene5DoorstepHandle } from './Scene5DoorstepHandover';
 
 const DIALOGUE_URDU = "Ye Lahore ka urgent COD parcel hai, kal lazmi milna chahiye!";
 const DIALOGUE_EN = "This is an urgent COD parcel for Lahore, must deliver tomorrow!";
@@ -84,11 +88,13 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
   const speechLine2TextRef = useRef<HTMLSpanElement>(null);
   const speechCursorRef = useRef<HTMLSpanElement>(null);
 
-  // Scene 2, Scene 3 & Match Cut direct DOM refs
+  // Scene 2, Scene 3, Scene 5 & Match Cut direct DOM refs
   const scene2Ref = useRef<Scene2Handle>(null);
   const scene2LayerRef = useRef<HTMLDivElement>(null);
   const scene3Ref = useRef<Scene3Handle>(null);
   const scene3LayerRef = useRef<HTMLDivElement>(null);
+  const scene5Ref = useRef<Scene5DoorstepHandle>(null);
+  const scene5LayerRef = useRef<HTMLDivElement>(null);
   const matchCutOverlayRef = useRef<HTMLDivElement>(null);
   const scrollVelocityRef = useRef<number>(0);
   const lastScrollYRef = useRef<number>(0);
@@ -332,10 +338,12 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
     (progress: number) => {
       scrollProgressRef.current = progress;
 
-      // Unified Movie Timeline Mapping across 1000vh scroll track:
-      // - First 500vh (progress: 0.00 -> 0.50) maps 1:1 to s12Progress (0.00 -> 1.00) for Scene 1 & Scene 2
-      // - Second 500vh (progress: 0.46 -> 1.00) drives the Scene 2 -> Scene 3 Match Cut & Scene 3 timeline
-      const s12Progress = Math.min(1, progress * 2);
+      // Unified 5-Scene Movie Timeline Mapping across 1650vh scroll track:
+      // - 0.00 -> 0.333: Maps 1:1 to s12Progress (0.00 -> 1.00) for Scene 1 (Packing) & Scene 2 (City Rush)
+      // - 0.31 -> 0.76: Drives Scene 3 (Ghost Scan Split Screen + Phone Rise) & Scene 4 (2-Step Fast WhatsApp Rescue)
+      // - 0.73 -> 0.96: Drives Scene 5 (10:00 AM Sunlit Doorstep Handover at Flat 4B)
+      // - 0.90 -> 1.00: Volumetric Cloud Bookend Closure (clouds roll back in to transition into About Us)
+      const s12Progress = Math.min(1, progress * 3);
 
       // Phase 1: Title Hold (0.00 -> 0.04) & Split Curtain Parting (0.04 -> 0.28)
       const titlePartProgress = Math.max(0, Math.min(1, (s12Progress - 0.04) / 0.24));
@@ -364,17 +372,25 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
         scrollPromptRef.current.style.opacity = Math.max(0, 1 - titlePartProgress * 3.5).toFixed(3);
       }
 
-      // Phase 2: Volumetric Cloud Plunge (holds dense during 0.00 -> 0.14 while title is read, then parts 0.14 -> 0.48)
-      const cloudProgress = Math.max(0, Math.min(1, (s12Progress - 0.10) / 0.38));
-      const cloudOpacity = Math.max(0, 1 - Math.pow(cloudProgress, 1.55));
+      // Phase 2: Volumetric Cloud Plunge (Entry: s12Progress 0.10 -> 0.48) & Cloud Bookend Closure (Exit: progress 0.90 -> 0.992)
+      const entryCloudProgress = Math.max(0, Math.min(1, (s12Progress - 0.10) / 0.38));
+      const entryCloudOpacity = Math.max(0, 1 - Math.pow(entryCloudProgress, 1.55));
+
+      const exitCloudCloseT = Math.max(0, Math.min(1, (progress - 0.90) / 0.092));
+      const exitCloudProgress = 1 - exitCloudCloseT;
+      const exitCloudOpacity = Math.pow(exitCloudCloseT, 1.35);
+
+      const isExitCloudsActive = progress >= 0.895;
+      const activeCloudProgress = isExitCloudsActive ? exitCloudProgress : entryCloudProgress;
+      const activeCloudOpacity = isExitCloudsActive ? exitCloudOpacity : entryCloudOpacity;
 
       if (cloudOverlayRef.current) {
-        if (cloudOpacity <= 0.002) {
+        if (activeCloudOpacity <= 0.002) {
           cloudOverlayRef.current.style.display = 'none';
         } else {
           cloudOverlayRef.current.style.display = 'block';
-          cloudOverlayRef.current.style.opacity = cloudOpacity.toFixed(3);
-          renderCloudCanvas(cloudProgress, cloudOpacity);
+          cloudOverlayRef.current.style.opacity = activeCloudOpacity.toFixed(3);
+          renderCloudCanvas(activeCloudProgress, activeCloudOpacity);
         }
       }
 
@@ -424,10 +440,17 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
       const s1Opacity = s12Progress < 0.45 ? 1 : Math.max(0, 1 - (s12Progress - 0.45) / 0.08);
       const s2EnterOpacity = s12Progress < 0.45 ? 0 : Math.min(1, (s12Progress - 0.45) / 0.08);
 
-      // Phase 7: Seamless Match Cut Cross-Fade 2 (Scene 2 -> Scene 3: progress 0.46 -> 0.52)
-      const s2ExitOpacity = progress < 0.46 ? 1 : Math.max(0, 1 - (progress - 0.46) / 0.055);
+      // Phase 7: Seamless Match Cut Cross-Fade 2 (Scene 2 -> Scene 3+4: progress 0.31 -> 0.35)
+      const s2ExitOpacity = progress < 0.31 ? 1 : Math.max(0, 1 - (progress - 0.31) / 0.04);
       const s2Opacity = Math.min(s2EnterOpacity, s2ExitOpacity);
-      const s3Opacity = progress < 0.46 ? 0 : Math.min(1, (progress - 0.46) / 0.055);
+      const s3EnterOpacity = progress < 0.31 ? 0 : Math.min(1, (progress - 0.31) / 0.04);
+
+      // Phase 8: Seamless Match Cut Cross-Fade 3 (Scene 3+4 -> Scene 5: progress 0.73 -> 0.77)
+      const s3ExitOpacity = progress < 0.73 ? 1 : Math.max(0, 1 - (progress - 0.73) / 0.04);
+      const s3Opacity = Math.min(s3EnterOpacity, s3ExitOpacity);
+      const s5EnterOpacity = progress < 0.73 ? 0 : Math.min(1, (progress - 0.73) / 0.04);
+      const s5ExitOpacity = progress < 0.94 ? 1 : Math.max(0, 1 - (progress - 0.94) / 0.05);
+      const s5Opacity = Math.min(s5EnterOpacity, s5ExitOpacity);
 
       // Warehouse SVG Visibility & Opacity
       if (trackRef.current) {
@@ -442,7 +465,7 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
 
       // Scene 2 City Rush Visibility & Opacity (Pure opacity cross-fade — zero CSS scale bitmap stretching)
       if (scene2LayerRef.current) {
-        if (s12Progress < 0.44 || progress > 0.525) {
+        if (s12Progress < 0.44 || progress > 0.355) {
           scene2LayerRef.current.style.visibility = 'hidden';
           scene2LayerRef.current.style.opacity = '0';
           scene2Ref.current?.setActive(false);
@@ -453,9 +476,9 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
         }
       }
 
-      // Scene 3 Doorstep Intercept Visibility & Opacity (Inside Same Unified Sticky Stage)
+      // Scene 3 Doorstep Intercept + Scene 4 WhatsApp Fast Rescue Visibility & Opacity
       if (scene3LayerRef.current) {
-        if (progress < 0.455) {
+        if (progress < 0.305 || progress > 0.775) {
           scene3LayerRef.current.style.visibility = 'hidden';
           scene3LayerRef.current.style.opacity = '0';
           scene3LayerRef.current.style.pointerEvents = 'none';
@@ -463,18 +486,35 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
         } else {
           scene3LayerRef.current.style.visibility = 'visible';
           scene3LayerRef.current.style.opacity = s3Opacity.toFixed(3);
-          scene3LayerRef.current.style.pointerEvents = progress > 0.50 ? 'auto' : 'none';
+          scene3LayerRef.current.style.pointerEvents = progress > 0.34 && progress < 0.74 ? 'auto' : 'none';
           scene3Ref.current?.setActive(true);
         }
       }
 
-      // Match Cut Speed Streaks Overlay (Flares at Scene 1->2 AND Scene 2->3 transitions)
+      // Scene 5 Sunlit Doorstep Handover Visibility & Opacity
+      if (scene5LayerRef.current) {
+        if (progress < 0.725 || progress > 0.995) {
+          scene5LayerRef.current.style.visibility = 'hidden';
+          scene5LayerRef.current.style.opacity = '0';
+          scene5LayerRef.current.style.pointerEvents = 'none';
+          scene5Ref.current?.setActive(false);
+        } else {
+          scene5LayerRef.current.style.visibility = 'visible';
+          scene5LayerRef.current.style.opacity = s5Opacity.toFixed(3);
+          scene5LayerRef.current.style.pointerEvents = 'none';
+          scene5Ref.current?.setActive(true);
+        }
+      }
+
+      // Match Cut Speed Streaks Overlay (Flares at Scene 1->2, Scene 2->3, and Scene 4->5 transitions)
       if (matchCutOverlayRef.current) {
         const distFromCut1 = Math.abs(s12Progress - 0.495);
         const matchProgress1 = Math.max(0, 1 - distFromCut1 / 0.045);
-        const distFromCut2 = Math.abs(progress - 0.49);
-        const matchProgress2 = Math.max(0, 1 - distFromCut2 / 0.032);
-        const matchProgress = Math.max(matchProgress1, matchProgress2);
+        const distFromCut2 = Math.abs(progress - 0.33);
+        const matchProgress2 = Math.max(0, 1 - distFromCut2 / 0.025);
+        const distFromCut3 = Math.abs(progress - 0.75);
+        const matchProgress3 = Math.max(0, 1 - distFromCut3 / 0.025);
+        const matchProgress = Math.max(matchProgress1, matchProgress2, matchProgress3);
 
         if (matchProgress <= 0.005) {
           matchCutOverlayRef.current.style.display = 'none';
@@ -484,24 +524,31 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
         }
       }
 
-      // Camera Whoosh Sound right at Match Cut 1 or Match Cut 2
+      // Camera Whoosh Sound right at Match Cut 1, Match Cut 2, or Match Cut 3
       const isAtCut1 = s12Progress >= 0.48 && s12Progress <= 0.52;
-      const isAtCut2 = progress >= 0.48 && progress <= 0.505;
-      if ((isAtCut1 || isAtCut2) && Math.abs(progress - lastWhooshProgressRef.current) > 0.04) {
+      const isAtCut2 = progress >= 0.32 && progress <= 0.345;
+      const isAtCut3 = progress >= 0.74 && progress <= 0.765;
+      if ((isAtCut1 || isAtCut2 || isAtCut3) && Math.abs(progress - lastWhooshProgressRef.current) > 0.03) {
         lastWhooshProgressRef.current = progress;
         soundEngine.playWhoosh();
       }
 
       // Drive Scene 2 City Rush timeline
-      if (scene2Ref.current && s12Progress >= 0.44 && progress <= 0.53) {
+      if (scene2Ref.current && s12Progress >= 0.44 && progress <= 0.36) {
         const p2 = Math.max(0, Math.min(1, (s12Progress - 0.47) / 0.53));
         scene2Ref.current.setProgress(p2, scrollVelocityRef.current);
       }
 
-      // Drive Scene 3 Doorstep Intercept timeline
-      if (scene3Ref.current && progress >= 0.455) {
-        const p3 = Math.max(0, Math.min(1, (progress - 0.46) / 0.54));
-        scene3Ref.current.setProgress(p3);
+      // Drive Scene 3 Doorstep Intercept + Scene 4 WhatsApp Fast Rescue timeline
+      if (scene3Ref.current && progress >= 0.305 && progress <= 0.78) {
+        const p34 = Math.max(0, Math.min(1, (progress - 0.31) / 0.43));
+        scene3Ref.current.setProgress(p34);
+      }
+
+      // Drive Scene 5 Sunlit Doorstep Handover timeline
+      if (scene5Ref.current && progress >= 0.725) {
+        const p5 = Math.max(0, Math.min(1, (progress - 0.74) / 0.22));
+        scene5Ref.current.setProgress(p5);
       }
     },
     [renderCloudCanvas, applyTapeMutations, isFullySealed]
@@ -589,7 +636,7 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
     setProgress: (p: number) => {
       targetScrollProgressRef.current = p;
       applyScrollMutations(p);
-      if (p >= 0.425 && !isFullySealed) {
+      if (p * 3 >= 0.425 && !isFullySealed) {
         sealProgressRef.current = 1;
         applyTapeMutations(1);
         soundEngine.playCartonThud();
@@ -610,12 +657,12 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
     let rafId = 0;
     let lastFrameTime = 0;
 
-    // Maximum narrative progress speed per second (scaled for unified 1000vh Scene 1+2+3 timeline)
-    const MAX_PROGRESS_SPEED = 0.17;
+    // Maximum narrative progress speed per second (scaled for unified 1650vh Scene 1-5 timeline)
+    const MAX_PROGRESS_SPEED = 0.125;
     // Exponential damping stiffness (higher = more responsive to slow scroll, capped by MAX_PROGRESS_SPEED on fast scroll)
     const DAMPING_LAMBDA = 9.5;
     // Maximum lead distance native scroll can get ahead of rendered animation during a fast fling
-    const MAX_FLING_LEAD = 0.08;
+    const MAX_FLING_LEAD = 0.06;
 
     const animateScrollLoop = (now: number) => {
       const dt =
@@ -895,13 +942,22 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
         <Scene2CityRush ref={scene2Ref} isPortrait={isPortrait} isActive={false} />
       </div>
 
-      {/* Scene 3 Doorstep Intercept Stage (Fades in at match cut 2 inside unified sticky stage) */}
+      {/* Scene 3 Doorstep Intercept + Scene 4 WhatsApp Fast Rescue Stage */}
       <div
         ref={scene3LayerRef}
         className="absolute inset-0 w-full h-full select-none z-15"
         style={{ visibility: 'hidden', opacity: 0, pointerEvents: 'none' }}
       >
         <Scene3Doorstep ref={scene3Ref} embedded={true} isPortrait={isPortrait} isActive={false} />
+      </div>
+
+      {/* Scene 5 Sunlit Doorstep Handover Stage (Fades in at match cut 3, closes into volumetric clouds) */}
+      <div
+        ref={scene5LayerRef}
+        className="absolute inset-0 w-full h-full select-none z-18"
+        style={{ visibility: 'hidden', opacity: 0, pointerEvents: 'none' }}
+      >
+        <Scene5DoorstepHandover ref={scene5Ref} isPortrait={isPortrait} isActive={false} />
       </div>
 
       {/* Match Cut Speed Streaks Overlay (Flares at Scene 1->2 and Scene 2->3 transitions) */}
@@ -2995,7 +3051,7 @@ export const Scene1Packing = React.forwardRef<Scene1Handle, Scene1PackingProps>(
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[1100vh] bg-[#0b0b0b]"
+      className="relative w-full h-[1650vh] bg-[#0b0b0b]"
       id="movie-scene-1"
       data-story-scene="true"
     >

@@ -22,6 +22,12 @@ export interface CustomerAyeshaProps extends React.SVGProps<SVGGElement> {
   tablePhoneGroupRef?: React.RefObject<SVGGElement | null>;
   tablePhoneHaloRef?: React.RefObject<SVGEllipseElement | null>;
   tablePhoneScreenRef?: React.RefObject<SVGPolygonElement | null>;
+  tablePhoneClockRef?: React.RefObject<SVGTextElement | null>;
+  tablePhoneHeaderClockRef?: React.RefObject<SVGTextElement | null>;
+  tablePhoneChatTrackRef?: React.RefObject<SVGGElement | null>;
+  tablePhoneQuickRepliesRef?: React.RefObject<SVGGElement | null>;
+  tablePhoneReplyBubbleRef?: React.RefObject<SVGGElement | null>;
+  tablePhoneConfirmBubbleRef?: React.RefObject<SVGGElement | null>;
 }
 
 export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
@@ -33,6 +39,12 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
       tablePhoneGroupRef,
       tablePhoneHaloRef,
       tablePhoneScreenRef,
+      tablePhoneClockRef,
+      tablePhoneHeaderClockRef,
+      tablePhoneChatTrackRef,
+      tablePhoneQuickRepliesRef,
+      tablePhoneReplyBubbleRef,
+      tablePhoneConfirmBubbleRef,
       transform,
       ...restProps
     },
@@ -52,10 +64,25 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
               0%, 92%, 100% { transform: scaleY(1); }
               95%, 96.5% { transform: scaleY(0.08); }
             }
+            @keyframes ayeshaChestBreathing {
+              0%, 100% { transform: translate(0px, 0px) scale(1); }
+              50% { transform: translate(-0.3px, -1.2px) scale(1.008); }
+            }
             .animate-ayesha-blink {
               animation: ayeshaEyeBlink 4.2s ease-in-out infinite;
               transform-box: fill-box;
               transform-origin: center;
+            }
+            .animate-ayesha-breathing {
+              animation: ayeshaChestBreathing 3.8s ease-in-out infinite;
+              transform-box: fill-box;
+              transform-origin: center;
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .animate-ayesha-blink,
+              .animate-ayesha-breathing {
+                animation: none !important;
+              }
             }
 
             /* Continuous Delicate Karak Tea Steam (Exact Scene 1 Continuous Ribbon Flow with Natural Rise & Dissipation) */
@@ -724,17 +751,19 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             opacity="0.42"
           />
 
-          {/* Minimalist Modern 18K Gold Collarbone Chain */}
+          {/* Minimalist Modern 18K Gold Collarbone Chain Seated in Clavicle Hollow */}
           <path
-            d="M 526 448 Q 538 462 550 448"
+            d="M 522 454 C 530 468, 546 468, 554 454"
             fill="none"
             stroke="url(#ayeshaGoldGrad)"
-            strokeWidth="1.1"
+            strokeWidth="1.2"
             strokeLinecap="round"
           />
+          {/* Delicate Gold Bail / Pendant Loop */}
+          <rect x="537.2" y="465" width="1.6" height="2.8" rx="0.6" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.4" />
           {/* Floating Solitary Natural Drop Pearl Pendant */}
-          <ellipse cx="538" cy="458" rx="2.2" ry="3.2" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.6" />
-          <ellipse cx="537.4" cy="456.8" rx="0.8" ry="1.2" fill="#ffffff" opacity="0.9" />
+          <ellipse cx="538" cy="470.5" rx="2.4" ry="3.4" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.65" />
+          <ellipse cx="537.4" cy="469.2" rx="0.85" ry="1.3" fill="#ffffff" opacity="0.92" />
 
           {/* Sculpted 3/4 Female Facial Cranium & Refined Jawline */}
           <path
@@ -762,48 +791,61 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             opacity="0.55"
             strokeLinecap="round"
           />
-          <path
-            d="M 498 368 L 493 390 L 498 402"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="0.8"
-            opacity="0.5"
-            strokeLinecap="round"
-          />
 
-          {/* 3D Anatomical Sculpted Nose Bridge, Alar Cartilage & Nostril */}
-          {/* Nose Bridge Line */}
+          {/* 3D Anatomical Sculpted Nose Bridge, Alar Cartilage & Nostril (Solid-Filled Skin so Nose is Never Transparent) */}
           <path
-            d="M 502 366 C 496 376, 488 384, 489 391 C 490 395, 496 397, 504 395"
+            d="M 502 364 C 496 374, 490 382, 488 388 C 486 392, 490 395, 494 395 C 499 395, 503 393, 506 391 Z"
+            fill="url(#ayeshaSkin3D)"
+          />
+          <path
+            d="M 502 364 C 496 374, 490 382, 488 388 C 486 392, 490 395, 494 395 C 499 395, 503 393, 506 391"
+            fill="#a66843"
+            opacity="0.18"
+          />
+          {/* Sculpted Bridge, Supratip Break & Rounded Nasal Lobule */}
+          <path
+            d="M 502 364 C 496 374, 489 383, 488 389 C 487.5 392.5, 491 394.5, 495 394.5"
             fill="none"
-            stroke="#8c502b"
-            strokeWidth="1.5"
+            stroke="#7d482a"
+            strokeWidth="1.4"
             strokeLinecap="round"
           />
           {/* Crisp Specular Dorsum Highlight */}
           <path
-            d="M 501 368 L 491 387"
+            d="M 501 366 L 490 387"
             fill="none"
             stroke="#ffffff"
             strokeWidth="1.1"
-            opacity="0.75"
+            opacity="0.8"
             strokeLinecap="round"
           />
-          {/* Subtle Nostril Curve & Alar Base Shadow */}
+          {/* Rounded Nasal Tip (Lobule) Specular Catchlight */}
+          <circle cx="489.5" cy="389" r="1.4" fill="#ffffff" opacity="0.75" />
+          {/* Alar Crease & Curved Nostril Wing */}
           <path
-            d="M 494 392 Q 498 395 502 393"
+            d="M 496 391 C 499 389, 504 390, 506 393"
             fill="none"
-            stroke="#451a03"
-            strokeWidth="1.1"
+            stroke="#8c502b"
+            strokeWidth="1"
             strokeLinecap="round"
           />
-          {/* Philtrum Dip Leading to Cupid's Bow */}
+          {/* Shaded Nostril Aperture Under Columella */}
+          <ellipse cx="493.8" cy="393.2" rx="2.4" ry="1.1" fill="#3b1806" opacity="0.85" transform="rotate(-15 493.8 393.2)" />
+          {/* Philtrum Columns Leading to Cupid's Bow */}
           <path
-            d="M 496 398 L 496 404"
+            d="M 495 396 L 495 404"
             fill="none"
             stroke="#a66843"
-            strokeWidth="0.9"
-            opacity="0.5"
+            strokeWidth="0.8"
+            opacity="0.55"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 497.5 396 L 497.5 404"
+            fill="none"
+            stroke="#a66843"
+            strokeWidth="0.8"
+            opacity="0.4"
             strokeLinecap="round"
           />
 
@@ -921,54 +963,73 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             opacity="0.55"
           />
 
-          {/* Sculpted Ear Anatomy with Helix, Tragus & Lobe */}
+          {/* Sculpted Anatomical Ear with Helix, Antihelix, Concha, Tragus & Lobe */}
+          {/* Outer Helix & Anatomical Ear Shell */}
           <path
-            d="M 560 370 C 570 368, 575 380, 569 394 C 565 400, 558 398, 557 390"
+            d="M 557 372 C 559 364, 571 364, 574 374 C 576 382, 572 393, 565 397 C 560 399, 555 394, 556 387 Z"
             fill="url(#ayeshaSkin3D)"
             stroke="#7d482a"
             strokeWidth="1.1"
           />
+          {/* Inner Concha Bowl Depth Shadow */}
           <path
-            d="M 563 374 C 567 375, 569 384, 564 390"
+            d="M 559 377 C 564 377, 566 384, 561 388 Z"
+            fill="#5c280b"
+            opacity="0.45"
+          />
+          {/* Curved Antihelix Ridge */}
+          <path
+            d="M 567 372 C 569 378, 568 386, 563 391"
             fill="none"
             stroke="#a66843"
-            strokeWidth="0.9"
-            opacity="0.6"
+            strokeWidth="0.95"
+            opacity="0.75"
+            strokeLinecap="round"
           />
-          <circle cx="560" cy="382" r="1.2" fill="#a66843" opacity="0.5" />
+          {/* Tragus Projection Guarding Ear Canal */}
+          <path
+            d="M 556 379 C 559 380, 559 384, 556 386"
+            fill="url(#ayeshaSkin3D)"
+            stroke="#7d482a"
+            strokeWidth="0.9"
+          />
+          {/* Earlobe Piercing Hole */}
+          <circle cx="562" cy="395.5" r="0.65" fill="#451a03" />
 
           {/* Minimalist Modern Jewelry: Sculpted 18K Gold Hoop Earring with Baroque Pearl Drop */}
-          {/* Gold Hoop Earring */}
+          {/* 18K Gold Hoop Earring Piercing Natural Earlobe */}
           <ellipse
             cx="562"
-            cy="394"
-            rx="3.4"
-            ry="4.2"
+            cy="400"
+            rx="3.5"
+            ry="4.5"
             fill="none"
             stroke="url(#ayeshaGoldGrad)"
             strokeWidth="1.6"
           />
           <ellipse
-            cx="561.4"
-            cy="393.2"
-            rx="1.5"
-            ry="2.2"
+            cx="561.2"
+            cy="399.2"
+            rx="1.6"
+            ry="2.4"
             fill="none"
             stroke="#ffffff"
-            strokeWidth="0.6"
-            opacity="0.8"
+            strokeWidth="0.65"
+            opacity="0.85"
           />
+          {/* Gold Connector Jump Ring */}
+          <circle cx="562" cy="404.5" r="1.1" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.5" />
           {/* Dangling Baroque Freshwater Pearl */}
           <ellipse
             cx="562"
-            cy="402"
-            rx="2.2"
-            ry="3.2"
+            cy="410"
+            rx="2.5"
+            ry="3.6"
             fill="url(#ayeshaPearlGrad)"
             stroke="#b45309"
-            strokeWidth="0.6"
+            strokeWidth="0.7"
           />
-          <ellipse cx="561.4" cy="400.8" rx="0.8" ry="1.2" fill="#ffffff" opacity="0.9" />
+          <ellipse cx="561.3" cy="408.6" rx="0.9" ry="1.4" fill="#ffffff" opacity="0.92" />
 
           {/* Multi-Layered Flowing Hair: Crown Volume, Side-Parted Bangs & Loose Temple Wisps */}
           {/* Main Crown Volume */}
@@ -1690,15 +1751,15 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
                 stroke="#10b981"
                 strokeWidth="1.2"
               />
-              <circle cx="12" cy="11" r="3.5" fill="#10b981" />
               <text
-                x="21"
+                x="58"
                 y="14.5"
+                textAnchor="middle"
                 fill="#ecfdf5"
                 fontSize="9.5"
                 fontFamily="sans-serif"
                 fontWeight="bold"
-                letterSpacing="0.5"
+                letterSpacing="0.6"
               >
                 Rs. 4,500 CASH
               </text>
@@ -1719,9 +1780,9 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
               <ellipse
                 ref={tablePhoneHaloRef}
                 cx="35"
-                cy="16"
-                rx="58"
-                ry="26"
+                cy="22"
+                rx="38"
+                ry="48"
                 fill="#10b981"
                 opacity={notificationActive ? 0.48 : 0}
                 style={{ mixBlendMode: 'screen' }}
@@ -1729,51 +1790,53 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
 
               {/* Multi-Layered Ambient Occlusion & Contact Shadow on Walnut Table */}
               <polygon
-                points="-3,15 56,5 73,26 13,36"
+                points="11,2 43,-4 58,45 26,51"
                 fill="#090300"
                 opacity="0.78"
               />
-              <ellipse cx="36" cy="22" rx="38" ry="12" fill="#090300" opacity="0.45" />
+              <ellipse cx="35" cy="24" rx="28" ry="32" fill="#090300" opacity="0.45" />
 
-              {/* 3D Extruded Titanium Bottom & Front-Left Sidewall Rail (6.5px Thickness) */}
+              {/* 3D Extruded Titanium Rails & Sidewalls (Portrait Smartphone) */}
+              {/* Left-Side Long Titanium Rail (Showing Action & Volume Buttons) */}
               <polygon
-                points="-1,9 57,-1 71,19 13,29 13,35.5 -1,15.5"
-                fill="url(#phoneTitaniumRail)"
-                stroke="#1e293b"
-                strokeWidth="0.9"
-              />
-              {/* Front-Bottom Titanium Sidewall Extrusion (Showing USB-C & Speaker Grille) */}
-              <polygon
-                points="13,29 71,19 71,25.5 13,35.5"
-                fill="url(#phoneTitaniumRail)"
-                stroke="#0f172a"
-                strokeWidth="0.9"
-              />
-              {/* Left-Side Titanium Rail Extrusion (Showing Volume & Action Buttons) */}
-              <polygon
-                points="-1,9 13,29 13,35.5 -1,15.5"
+                points="14,0 28,48 28,54.5 14,6.5"
                 fill="#64748b"
                 stroke="#1e293b"
                 strokeWidth="0.8"
               />
 
-              {/* Physical Side Buttons on Left Titanium Rail */}
-              <polygon points="2,14.5 5,18.8 5,21 2,16.7" fill="#cbd5e1" stroke="#334155" strokeWidth="0.4" />
-              <polygon points="6.5,21 10,26 10,28.2 6.5,23.2" fill="#cbd5e1" stroke="#334155" strokeWidth="0.4" />
-
-              {/* Bottom Edge USB-C Port & Speaker Micro-Perforations */}
-              <polygon points="39,26.5 46,25.3 46,27.5 39,28.7" fill="#020617" stroke="#94a3b8" strokeWidth="0.4" />
-              <circle cx="29" cy="29.3" r="0.7" fill="#0f172a" />
-              <circle cx="32" cy="28.8" r="0.7" fill="#0f172a" />
-              <circle cx="35" cy="28.3" r="0.7" fill="#0f172a" />
-              <circle cx="50" cy="25.7" r="0.7" fill="#0f172a" />
-              <circle cx="53" cy="25.2" r="0.7" fill="#0f172a" />
-              <circle cx="56" cy="24.7" r="0.7" fill="#0f172a" />
-
-              {/* Top Chamfered Titanium Bezel Rim */}
+              {/* Front-Bottom Short Titanium Sidewall (Bottom Edge with USB-C & Speakers) */}
               <polygon
-                points="-1,9 57,-1 71,19 13,29"
-                fill="#0f172a"
+                points="28,48 54,43.5 54,50 28,54.5"
+                fill="url(#phoneTitaniumRail)"
+                stroke="#0f172a"
+                strokeWidth="0.9"
+              />
+
+              {/* Physical Side Buttons on Left Titanium Long Rail */}
+              {/* Action Button */}
+              <polygon points="16,8.5 17.5,13.5 17.5,15.5 16,10.5" fill="#cbd5e1" stroke="#334155" strokeWidth="0.4" />
+              {/* Volume Up Button */}
+              <polygon points="19,17.5 21,24.5 21,26.5 19,19.5" fill="#cbd5e1" stroke="#334155" strokeWidth="0.4" />
+              {/* Volume Down Button */}
+              <polygon points="22.5,29.5 24.5,36.5 24.5,38.5 22.5,31.5" fill="#cbd5e1" stroke="#334155" strokeWidth="0.4" />
+
+              {/* Bottom Edge: USB-C Port Centered on the Bottom of the Phone */}
+              <polygon points="38,48.5 44,47.5 44,49.8 38,50.8" fill="#020617" stroke="#94a3b8" strokeWidth="0.4" />
+              <line x1="39.5" y1="49.3" x2="42.5" y2="48.8" stroke="#cbd5e1" strokeWidth="0.4" />
+
+              {/* Bottom Edge: Speaker & Microphone Micro-Perforations on Bottom Side */}
+              <circle cx="31" cy="50.4" r="0.7" fill="#0f172a" />
+              <circle cx="33.5" cy="50.0" r="0.7" fill="#0f172a" />
+              <circle cx="36" cy="49.6" r="0.7" fill="#0f172a" />
+              <circle cx="46" cy="47.9" r="0.7" fill="#0f172a" />
+              <circle cx="48.5" cy="47.5" r="0.7" fill="#0f172a" />
+              <circle cx="51" cy="47.1" r="0.7" fill="#0f172a" />
+
+              {/* Top Chamfered Titanium Bezel Rim (Portrait Screen Perimeter) */}
+              <polygon
+                points="14,0 40,-4.5 54,43.5 28,48"
+                fill="#070a12"
                 stroke={notificationActive ? '#34d399' : '#94a3b8'}
                 strokeWidth="1.3"
               />
@@ -1781,78 +1844,456 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
               {/* Smartphone Illuminated OLED Screen (Preserves tablePhoneScreenRef for rAF) */}
               <polygon
                 ref={tablePhoneScreenRef}
-                points="2.5,9.8 55.2,0.8 67.2,17.8 14.5,26.8"
-                fill={notificationActive ? '#064e3b' : '#0f172a'}
+                points="16.5,2.2 38.5,-1.6 51.5,41.8 29.5,45.6"
+                fill="#0b141a"
               />
 
-              {/* Diagonal Specular Glass Screen Reflection */}
-              <polygon
-                points="16,7.5 34,4.5 46,21.2 28,24.2"
-                fill="#ffffff"
-                opacity="0.12"
-              />
+              {/* =============================================================== */}
+              {/* EXACT SYNCHRONIZED WHATSAPP BUSINESS SCREEN REPLICA (220 x 434) */}
+              {/* Mapped 1:1 onto the 3D table phone screen polygon               */}
+              {/* =============================================================== */}
+              <defs>
+                <clipPath id="tablePhoneScreenOuterClip">
+                  <rect x="0" y="0" width="220" height="434" rx="10" />
+                </clipPath>
+                <clipPath id="tablePhoneChatViewportClip">
+                  <rect x="0" y="76" width="220" height="336" />
+                </clipPath>
+              </defs>
 
-              {/* Dynamic Island / Front Camera Pill Cutout on Upper Left of Screen */}
-              <polygon
-                points="6.5,14.5 9.5,14 13,19 10,19.5"
-                fill="#020617"
-                stroke="#334155"
-                strokeWidth="0.4"
-              />
-              <circle cx="8.5" cy="15.5" r="0.7" fill="#0ea5e9" opacity="0.85" />
-
-              {/* Lock-Screen Clock Display (11:42) */}
-              <text
-                x="17"
-                y="15"
-                fill="#f8fafc"
-                fontSize="5.2"
-                fontFamily="monospace"
-                fontWeight="900"
-                transform="rotate(-9.5 17 15) skewX(18)"
-                opacity="0.92"
+              <g
+                transform="matrix(0.1, -0.017273, 0.029954, 0.1, 16.5, 2.2)"
+                clipPath="url(#tablePhoneScreenOuterClip)"
               >
-                11:42
-              </text>
+                {/* Base Dark WhatsApp Screen Canvas */}
+                <rect x="0" y="0" width="220" height="434" fill="#0b141a" />
 
-              {/* WhatsApp Notification Banner Card on OLED Screen */}
+                {/* 1. Top Status Bar (Exact Match: 11:43/11:44 + Camera Ring + 5G + Battery) */}
+                <rect x="0" y="0" width="220" height="28" fill="#070a12" />
+                <line x1="0" y1="28" x2="220" y2="28" stroke="#1e293b" strokeWidth="1.2" />
+                <text
+                  ref={tablePhoneClockRef}
+                  x="14"
+                  y="18.5"
+                  fill="#e2e8f0"
+                  fontSize="12"
+                  fontFamily="monospace"
+                  fontWeight="700"
+                >
+                  11:43
+                </text>
+                {/* Sensor, Earpiece Speaker Pill & Glowing Front Camera Ring */}
+                <circle cx="84" cy="14" r="3.2" fill="#0f172a" stroke="#475569" strokeWidth="1" />
+                <rect
+                  x="94"
+                  y="11.5"
+                  width="28"
+                  height="5"
+                  rx="2.5"
+                  fill="#0f172a"
+                  stroke="#475569"
+                  strokeWidth="1"
+                />
+                <circle cx="132" cy="14" r="6.2" fill="#020617" stroke="#94a3b8" strokeWidth="1.4" />
+                <circle cx="132" cy="14" r="3.8" fill="#0c1e3e" stroke="#38bdf8" strokeWidth="1" />
+                <circle cx="130.8" cy="12.8" r="1.1" fill="#7dd3fc" />
+                {/* 5G & Emerald Battery */}
+                <text
+                  x="168"
+                  y="18"
+                  fill="#cbd5e1"
+                  fontSize="10.5"
+                  fontFamily="monospace"
+                  fontWeight="700"
+                >
+                  5G
+                </text>
+                <rect
+                  x="186"
+                  y="9"
+                  width="19"
+                  height="10"
+                  rx="2"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="1.2"
+                />
+                <rect x="188" y="11" width="15" height="6" rx="1" fill="#34d399" />
+
+                {/* 2. WhatsApp Business Header Bar (#075e54 with Emerald 'R' & Rasai ✓) */}
+                <rect x="0" y="28" width="220" height="48" fill="#075e54" />
+                <line x1="0" y1="76" x2="220" y2="76" stroke="#064e3b" strokeWidth="1.5" />
+                <circle cx="24" cy="52" r="13" fill="#34d399" />
+                <text
+                  x="24"
+                  y="56.5"
+                  textAnchor="middle"
+                  fill="#022c22"
+                  fontSize="13"
+                  fontFamily="sans-serif"
+                  fontWeight="900"
+                >
+                  R
+                </text>
+                <text
+                  x="44"
+                  y="48"
+                  fill="#ffffff"
+                  fontSize="12.5"
+                  fontFamily="sans-serif"
+                  fontWeight="800"
+                >
+                  Rasai
+                </text>
+                <circle cx="86" cy="44" r="5.8" fill="#34d399" />
+                <text
+                  x="86"
+                  y="47.2"
+                  textAnchor="middle"
+                  fill="#022c22"
+                  fontSize="8"
+                  fontFamily="sans-serif"
+                  fontWeight="900"
+                >
+                  ✓
+                </text>
+                <text
+                  x="44"
+                  y="62.5"
+                  fill="#a7f3d0"
+                  fontSize="9"
+                  fontFamily="sans-serif"
+                  fontWeight="600"
+                >
+                  Official WhatsApp Business
+                </text>
+                <text
+                  ref={tablePhoneHeaderClockRef}
+                  x="208"
+                  y="54"
+                  textAnchor="end"
+                  fill="#a7f3d0"
+                  fontSize="9.5"
+                  fontFamily="monospace"
+                >
+                  11:43 AM
+                </text>
+
+                {/* 3. Synchronized Clipped WhatsApp Chat Body */}
+                <g clipPath="url(#tablePhoneChatViewportClip)">
+                  <g ref={tablePhoneChatTrackRef} transform="translate(0, 0)">
+                    {/* Amber Ghost Scan Pill */}
+                    <rect
+                      x="18"
+                      y="86"
+                      width="184"
+                      height="19"
+                      rx="9.5"
+                      fill="#1e293b"
+                      stroke="#f59e0b"
+                      strokeOpacity="0.45"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x="110"
+                      y="98.5"
+                      textAnchor="middle"
+                      fill="#fcd34d"
+                      fontSize="7.6"
+                      fontFamily="monospace"
+                      fontWeight="700"
+                    >
+                      GHOST SCAN INTERCEPTED • 2.8 KM AWAY
+                    </text>
+
+                    {/* Incoming Rasai Message Bubble (#1f2c34) */}
+                    <rect
+                      x="10"
+                      y="114"
+                      width="200"
+                      height="132"
+                      rx="12"
+                      fill="#1f2c34"
+                      stroke="#334155"
+                      strokeWidth="1.2"
+                    />
+                    <text
+                      x="20"
+                      y="133"
+                      fill="#6ee7b7"
+                      fontSize="10.5"
+                      fontFamily="sans-serif"
+                      fontWeight="700"
+                    >
+                      Assalam-o-Alaikum Ayesha!
+                    </text>
+                    <text x="20" y="150" fill="#e2e8f0" fontSize="9" fontFamily="sans-serif">
+                      Our courier marked &ldquo;Customer Unavailable&rdquo;
+                    </text>
+                    <text x="20" y="163" fill="#e2e8f0" fontSize="9" fontFamily="sans-serif">
+                      for parcel #LP-9042 (COD Rs. 4,500),
+                    </text>
+                    <text x="20" y="176" fill="#e2e8f0" fontSize="9" fontFamily="sans-serif">
+                      but Rasai detected rider was 2.8 km away.
+                    </text>
+                    <text
+                      x="20"
+                      y="196"
+                      fill="#ffffff"
+                      fontSize="9"
+                      fontFamily="sans-serif"
+                      fontWeight="700"
+                    >
+                      We blocked the return. Are you home
+                    </text>
+                    <text
+                      x="20"
+                      y="209"
+                      fill="#ffffff"
+                      fontSize="9"
+                      fontFamily="sans-serif"
+                      fontWeight="700"
+                    >
+                      right now?
+                    </text>
+                    <text
+                      x="200"
+                      y="236"
+                      textAnchor="end"
+                      fill="#94a3b8"
+                      fontSize="8"
+                      fontFamily="monospace"
+                    >
+                      11:43 AM
+                    </text>
+
+                    {/* Quick-Reply Interactive Buttons (Visible before Step 1 Reply) */}
+                    <g ref={tablePhoneQuickRepliesRef}>
+                      {/* Button 1: Bright Emerald */}
+                      <rect
+                        x="10"
+                        y="256"
+                        width="200"
+                        height="35"
+                        rx="9"
+                        fill="#10b981"
+                        stroke="#a7f3d0"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="110"
+                        y="277"
+                        textAnchor="middle"
+                        fill="#022c22"
+                        fontSize="9.2"
+                        fontFamily="sans-serif"
+                        fontWeight="900"
+                      >
+                        ✓ Yes, I&apos;m Home (Rs. 4,500 Cash Ready)
+                      </text>
+                      {/* Button 2: Dark with Emerald Border */}
+                      <rect
+                        x="10"
+                        y="298"
+                        width="200"
+                        height="35"
+                        rx="9"
+                        fill="#1f2c34"
+                        stroke="#10b981"
+                        strokeOpacity="0.5"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="110"
+                        y="319"
+                        textAnchor="middle"
+                        fill="#6ee7b7"
+                        fontSize="9"
+                        fontFamily="sans-serif"
+                        fontWeight="700"
+                      >
+                        📍 Share Exact Gulberg Doorstep Pin
+                      </text>
+                      {/* Button 3: Dark with Slate Border */}
+                      <rect
+                        x="10"
+                        y="340"
+                        width="200"
+                        height="35"
+                        rx="9"
+                        fill="#1f2c34"
+                        stroke="#334155"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="110"
+                        y="361"
+                        textAnchor="middle"
+                        fill="#cbd5e1"
+                        fontSize="9"
+                        fontFamily="sans-serif"
+                        fontWeight="600"
+                      >
+                        📅 Reschedule Time Slot
+                      </text>
+                    </g>
+
+                    {/* Scene 4 Step 1: Ayesha Outgoing Reply Bubble + Gulberg III Map Card */}
+                    <g
+                      ref={tablePhoneReplyBubbleRef}
+                      style={{ display: 'none', opacity: 0 }}
+                    >
+                      <rect
+                        x="22"
+                        y="256"
+                        width="188"
+                        height="142"
+                        rx="12"
+                        fill="#005c4b"
+                        stroke="#10b981"
+                        strokeOpacity="0.45"
+                        strokeWidth="1.2"
+                      />
+                      <text
+                        x="32"
+                        y="275"
+                        fill="#ecfdf5"
+                        fontSize="9.2"
+                        fontFamily="sans-serif"
+                        fontWeight="700"
+                      >
+                        ✓ Yes, I&apos;m home! Rs. 4,500 cash is ready.
+                      </text>
+                      {/* Mini Vector Map Card */}
+                      <rect
+                        x="32"
+                        y="284"
+                        width="168"
+                        height="86"
+                        rx="8"
+                        fill="#071915"
+                        stroke="#34d399"
+                        strokeOpacity="0.4"
+                        strokeWidth="1"
+                      />
+                      <line x1="32" y1="304" x2="200" y2="304" stroke="#0f352c" strokeWidth="4" />
+                      <line x1="32" y1="332" x2="200" y2="332" stroke="#0d2b24" strokeWidth="3" />
+                      <line x1="76" y1="284" x2="66" y2="350" stroke="#0f352c" strokeWidth="3.5" />
+                      <line x1="154" y1="284" x2="162" y2="350" stroke="#0d2b24" strokeWidth="3" />
+                      <rect
+                        x="92"
+                        y="308"
+                        width="48"
+                        height="18"
+                        rx="2"
+                        fill="#0f2f26"
+                        stroke="#10b981"
+                        strokeWidth="1"
+                        strokeDasharray="3 2"
+                      />
+                      <circle cx="116" cy="318" r="9" fill="none" stroke="#34d399" strokeWidth="1.2" opacity="0.6" />
+                      <path
+                        d="M116,318 C112,312 109,309 109,305 C109,301 112,298 116,298 C120,298 123,301 123,305 C123,309 120,312 116,318 Z"
+                        fill="#10b981"
+                        stroke="#ecfdf5"
+                        strokeWidth="1"
+                      />
+                      <circle cx="116" cy="305" r="2.2" fill="#052e16" />
+                      <rect x="32" y="350" width="168" height="20" rx="4" fill="#09221c" />
+                      <text
+                        x="40"
+                        y="363"
+                        fill="#ffffff"
+                        fontSize="7.8"
+                        fontFamily="monospace"
+                        fontWeight="700"
+                      >
+                        📍 Flat 4B, Gulberg III
+                      </text>
+                      <text
+                        x="198"
+                        y="390"
+                        textAnchor="end"
+                        fill="#a7f3d0"
+                        fontSize="7.5"
+                        fontFamily="sans-serif"
+                      >
+                        Live Doorstep Pin Attached • 11:44 AM ✓✓
+                      </text>
+                    </g>
+
+                    {/* Scene 4 Step 2: Rasai Priority Run-Sheet Confirmation Bubble */}
+                    <g
+                      ref={tablePhoneConfirmBubbleRef}
+                      style={{ display: 'none', opacity: 0 }}
+                    >
+                      <rect
+                        x="10"
+                        y="406"
+                        width="200"
+                        height="104"
+                        rx="12"
+                        fill="#1f2c34"
+                        stroke="#10b981"
+                        strokeOpacity="0.4"
+                        strokeWidth="1.2"
+                      />
+                      <rect
+                        x="20"
+                        y="416"
+                        width="162"
+                        height="16"
+                        rx="8"
+                        fill="#064e3b"
+                        stroke="#34d399"
+                        strokeOpacity="0.4"
+                        strokeWidth="0.8"
+                      />
+                      <text
+                        x="101"
+                        y="427"
+                        textAnchor="middle"
+                        fill="#6ee7b7"
+                        fontSize="7.2"
+                        fontFamily="monospace"
+                        fontWeight="700"
+                      >
+                        ✓ 07:30 AM PRIORITY RUN-SHEET LOCKED
+                      </text>
+                      <text x="20" y="446" fill="#e2e8f0" fontSize="8.8" fontFamily="sans-serif">
+                        Shukriya Ayesha! Your exact Gulberg III
+                      </text>
+                      <text x="20" y="459" fill="#ffffff" fontSize="8.8" fontFamily="sans-serif" fontWeight="700">
+                        pin is locked for #LP-9042 (Rs. 4,500).
+                      </text>
+                      <text x="20" y="472" fill="#6ee7b7" fontSize="8.8" fontFamily="sans-serif" fontWeight="700">
+                        Guaranteed delivery tomorrow 10:00 AM.
+                      </text>
+                      <text
+                        x="200"
+                        y="498"
+                        textAnchor="end"
+                        fill="#94a3b8"
+                        fontSize="7.5"
+                        fontFamily="monospace"
+                      >
+                        11:44 AM
+                      </text>
+                    </g>
+                  </g>
+                </g>
+
+                {/* 4. Bottom Home Indicator Bar */}
+                <rect x="0" y="412" width="220" height="22" fill="#070a12" />
+                <rect x="72" y="420" width="76" height="4.5" rx="2.25" fill="#475569" />
+              </g>
+
+              {/* Diagonal Specular Glass Screen Reflection on Top of Display */}
               <polygon
-                points="24,9.5 54,4.5 60,13 30,18"
-                fill={notificationActive ? '#10b981' : '#1e293b'}
-                stroke={notificationActive ? '#a7f3d0' : '#475569'}
-                strokeWidth="0.6"
-              />
-              {/* Notification WhatsApp Badge Dot & Message Lines */}
-              <circle cx="30" cy="12.5" r="1.8" fill={notificationActive ? '#022c22' : '#10b981'} />
-              <line
-                x1="34"
-                y1="10.8"
-                x2="52"
-                y2="7.8"
-                stroke={notificationActive ? '#022c22' : '#e2e8f0'}
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
-              <line
-                x1="35.5"
-                y1="13.5"
-                x2="55"
-                y2="10.2"
-                stroke={notificationActive ? '#ecfdf5' : '#94a3b8'}
-                strokeWidth="1"
-                strokeLinecap="round"
-              />
-
-              {/* Home Bar Indicator at Right/Bottom of Screen */}
-              <line
-                x1="58"
-                y1="9"
-                x2="63"
-                y2="16"
-                stroke="#cbd5e1"
-                strokeWidth="0.9"
-                strokeLinecap="round"
-                opacity="0.75"
+                points="20,6 30,4 40,38 30,40"
+                fill="#ffffff"
+                opacity="0.09"
+                pointerEvents="none"
               />
             </g>
           </g>
@@ -1918,7 +2359,7 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             stroke="#7d482a"
             strokeWidth="1.2"
           />
-          {/* Forearm Muscle & Tendon Shading */}
+          {/* Forearm Muscle, Extensor Tendon & Radius Bone Shading */}
           <path
             d="M 552 602 C 538 624, 520 638, 502 646"
             fill="none"
@@ -1927,34 +2368,77 @@ export const CustomerAyesha = forwardRef<SVGGElement, CustomerAyeshaProps>(
             opacity="0.45"
             strokeLinecap="round"
           />
+          <path
+            d="M 558 608 C 542 630, 526 648, 508 658"
+            fill="none"
+            stroke="#8c502b"
+            strokeWidth="0.9"
+            opacity="0.35"
+            strokeLinecap="round"
+          />
 
-          {/* Sleek Minimalist Modern 18K Gold Wristwatch */}
-          <g transform="translate(524, 638) rotate(-25)">
-            {/* Segmented Gold Link Bracelet */}
+          {/* Fully Sculpted Minimalist Modern 18K Gold Wristwatch Perfectly Aligned on Wrist */}
+          <g id="ayesha-wrist-watch" transform="translate(506, 654) rotate(-29)">
+            {/* Watch Cast Shadow on Wrist Skin */}
             <path
-              d="M -5 -11 L 5 -11 L 5 11 L -5 11 Z"
+              d="M -6.5 -11 C -1 -12, 1 -12, 6.5 -11 L 6 12 C 1 12.8, -1 12.8, -6 12 Z"
+              fill="#451a03"
+              opacity="0.32"
+            />
+
+            {/* Seamless Curved 18K Gold Bracelet Wrapping from Edge to Edge Across Wrist */}
+            <path
+              d="M -4.5 -11.5 C -1 -12.4, 1 -12.4, 4.5 -11.5 L 4 12 C 1 12.8, -1 12.8, -4 12 Z"
               fill="url(#ayeshaGoldGrad)"
               stroke="#78350f"
               strokeWidth="0.8"
             />
-            <line x1="-5" y1="-5" x2="5" y2="-5" stroke="#78350f" strokeWidth="0.8" />
-            <line x1="-5" y1="5" x2="5" y2="5" stroke="#78350f" strokeWidth="0.8" />
-            {/* Ultra-Slim Gold Watch Bezel */}
+            {/* Articulated Gold Jubilee Link Segments */}
+            <line x1="-4.3" y1="-8.5" x2="4.3" y2="-8.5" stroke="#78350f" strokeWidth="0.75" />
+            <line x1="-4.1" y1="-5.5" x2="4.1" y2="-5.5" stroke="#78350f" strokeWidth="0.75" />
+            <line x1="-3.9" y1="5.5" x2="3.9" y2="5.5" stroke="#78350f" strokeWidth="0.75" />
+            <line x1="-3.9" y1="8.5" x2="3.9" y2="8.5" stroke="#78350f" strokeWidth="0.75" />
+            {/* Specular Center Track Highlight on Links */}
+            <line x1="0" y1="-11" x2="0" y2="-5.5" stroke="#ffffff" strokeWidth="0.8" opacity="0.65" />
+            <line x1="0" y1="5.5" x2="0" y2="11.5" stroke="#ffffff" strokeWidth="0.8" opacity="0.65" />
+
+            {/* Sculpted 18K Gold Case Lugs */}
+            <path d="M -3.5 -5 L -4 -9.5 L -2 -9.5 L -1.5 -5 Z" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.6" />
+            <path d="M 3.5 -5 L 4 -9.5 L 2 -9.5 L 1.5 -5 Z" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.6" />
+            <path d="M -3.5 5 L -4 9.5 L -2 9.5 L -1.5 5 Z" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.6" />
+            <path d="M 3.5 5 L 4 9.5 L 2 9.5 L 1.5 5 Z" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.6" />
+
+            {/* 3 o'clock Crown Knurled Winder */}
+            <rect x="6.4" y="-1.4" width="1.6" height="2.8" rx="0.5" fill="#b45309" stroke="#78350f" strokeWidth="0.4" />
+
+            {/* Ultra-Slim Polished 18K Gold Bezel */}
             <circle cx="0" cy="0" r="6.8" fill="url(#ayeshaGoldGrad)" stroke="#78350f" strokeWidth="0.9" />
-            {/* Luminous Mother-of-Pearl Dial */}
-            <circle cx="0" cy="0" r="5.2" fill="url(#ayeshaPearlGrad)" stroke="#b45309" strokeWidth="0.6" />
-            {/* Dial Hour Markers & Polished Hands */}
+            <circle cx="0" cy="0" r="5.8" fill="none" stroke="#fef08a" strokeWidth="0.5" opacity="0.85" />
+
+            {/* Luminous Natural Mother-of-Pearl Dial */}
+            <circle cx="0" cy="0" r="5.2" fill="url(#ayeshaPearlGrad)" stroke="#92400e" strokeWidth="0.55" />
+
+            {/* Dial Hour Markers (12, 3, 6, 9 Gold Cabochon Studs) */}
             <circle cx="0" cy="-3.6" r="0.6" fill="#78350f" />
             <circle cx="3.6" cy="0" r="0.6" fill="#78350f" />
             <circle cx="0" cy="3.6" r="0.6" fill="#78350f" />
             <circle cx="-3.6" cy="0" r="0.6" fill="#78350f" />
-            <line x1="0" y1="0" x2="2.2" y2="-2.6" stroke="#451a03" strokeWidth="1" strokeLinecap="round" />
-            <line x1="0" y1="0" x2="-2.6" y2="0.8" stroke="#451a03" strokeWidth="1" strokeLinecap="round" />
-            <circle cx="0" cy="0" r="0.8" fill="#d97706" />
+
+            {/* Lancet Polished Gold Hands (Set to 11:42 AM) */}
+            <line x1="0" y1="0" x2="-1.2" y2="-2.8" stroke="#451a03" strokeWidth="1.1" strokeLinecap="round" />
+            <line x1="0" y1="0" x2="2.6" y2="1.2" stroke="#451a03" strokeWidth="0.85" strokeLinecap="round" />
+            <circle cx="0" cy="0" r="0.85" fill="#d97706" />
+
+            {/* Curved Watch Glass Reflection */}
+            <path
+              d="M -3.8 -3.2 A 4.8 4.8 0 0 1 3.5 -3.2 Q 0 -1.5 -3.8 -3.2 Z"
+              fill="#ffffff"
+              opacity="0.4"
+            />
           </g>
 
           {/* Fully Articulated Sculpted Right Hand & Extended Fingers */}
-          {/* Palm Base & Thenar Eminence */}
+          {/* Palm Base, Hypothenar & Thenar Eminence */}
           <path
             d="M 504 650 C 494 650, 482 652, 474 654 C 470 658, 478 664, 492 664 L 506 662 Z"
             fill="url(#ayeshaSkin3D)"

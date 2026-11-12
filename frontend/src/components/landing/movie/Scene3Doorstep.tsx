@@ -106,6 +106,12 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
     const rightGreenGlowRef = useRef<HTMLDivElement>(null);
     const tablePhoneHaloRef = useRef<SVGEllipseElement>(null);
     const tablePhoneScreenRef = useRef<SVGPolygonElement>(null);
+    const tablePhoneClockRef = useRef<SVGTextElement>(null);
+    const tablePhoneHeaderClockRef = useRef<SVGTextElement>(null);
+    const tablePhoneChatTrackRef = useRef<SVGGElement>(null);
+    const tablePhoneQuickRepliesRef = useRef<SVGGElement>(null);
+    const tablePhoneReplyBubbleRef = useRef<SVGGElement>(null);
+    const tablePhoneConfirmBubbleRef = useRef<SVGGElement>(null);
     const ayeshaRightArmRef = useRef<SVGGElement>(null);
     const ayeshaTablePhoneGroupRef = useRef<SVGGElement>(null);
     const ayeshaNotificationPillRef = useRef<HTMLDivElement>(null);
@@ -114,17 +120,30 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
     const ayeshaEnTextRef = useRef<HTMLSpanElement>(null);
     const ayeshaCursorRef = useRef<HTMLSpanElement>(null);
 
-    // Minimal One-Line Caption Ref
+    // Minimal One-Line Caption Refs (Scene 3 & Scene 4)
     const minimalCaptionRef = useRef<HTMLDivElement>(null);
+    const scene4CaptionRef = useRef<HTMLDivElement>(null);
 
-    // Phase 4: Rising Unlocked WhatsApp Phone Modal Ref
+    // Phase 4 & Scene 4: Rising Unlocked WhatsApp Phone Modal & 2-Step Fast Rescue Refs
     const unlockedPhoneContainerRef = useRef<HTMLDivElement>(null);
+    const phoneClockTextRef = useRef<HTMLSpanElement>(null);
+    const waHeaderClockRef = useRef<HTMLSpanElement>(null);
+    const chatMessagesTrackRef = useRef<HTMLDivElement>(null);
+    const quickRepliesTrayRef = useRef<HTMLDivElement>(null);
+    const yesHomeBtnRef = useRef<HTMLButtonElement>(null);
+    const ayeshaReplyBubbleRef = useRef<HTMLDivElement>(null);
+    const gpsPinSvgGroupRef = useRef<SVGGElement>(null);
+    const gpsPulseRingRef = useRef<SVGCircleElement>(null);
+    const rasaiConfirmBubbleRef = useRef<HTMLDivElement>(null);
+    const manualRescueTriggeredRef = useRef<boolean>(false);
 
     // One-shot audio trigger guards
     const hasPlayedBuzzRef = useRef<boolean>(false);
     const hasPlayedSplitWhooshRef = useRef<boolean>(false);
     const hasPlayedGhostScanAlertRef = useRef<boolean>(false);
     const hasPlayedWhatsAppChimeRef = useRef<boolean>(false);
+    const hasPlayedS4TapChimeRef = useRef<boolean>(false);
+    const hasPlayedS4ConfirmChimeRef = useRef<boolean>(false);
     const lastKamranCharsRef = useRef<number>(-1);
     const lastAyeshaCharsRef = useRef<number>(-1);
 
@@ -142,12 +161,21 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
     // =========================================================================
     // ZERO-RE-RENDER SCROLL MUTATION ENGINE (60Hz / 120Hz / 144Hz)
     // =========================================================================
-    const applyScrollMutations = useCallback((progress: number) => {
-      scrollProgressRef.current = progress;
+    const applyScrollMutations = useCallback((rawProgress: number) => {
+      scrollProgressRef.current = rawProgress;
 
-      // Gate overall sticky stage visibility so Scene 1 & 2 remain unobstructed when progress <= 0.001
+      // Map 0.00 -> 0.64 to Scene 3 Phases 1-4 (Phone Match Cut, Split Screen, Ghost Scan, Phone Rise)
+      // Map 0.62 -> 1.00 to Scene 4 (2-Step Fast WhatsApp Rescue inside the risen 3D Smartphone)
+      const progress = Math.min(1, rawProgress / 0.64);
+      const s4Progress = Math.max(0, Math.min(1, (rawProgress - 0.62) / 0.38));
+
+      if (rawProgress < 0.56 && manualRescueTriggeredRef.current) {
+        manualRescueTriggeredRef.current = false;
+      }
+
+      // Gate overall sticky stage visibility so Scene 1 & 2 remain unobstructed when rawProgress <= 0.001
       if (stickyStageRef.current) {
-        if (!embedded && progress <= 0.001) {
+        if (!embedded && rawProgress <= 0.001) {
           stickyStageRef.current.style.visibility = 'hidden';
           stickyStageRef.current.style.opacity = '0';
           stickyStageRef.current.style.pointerEvents = 'none';
@@ -230,12 +258,13 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
       const smoothExpandRight = expandRightT * expandRightT * (3 - 2 * expandRightT);
       // Divider percentage from left edge (50% during split, 0% when Ayesha expands fullscreen)
       const dividerPct = 50 * (1 - smoothExpandRight);
+      const leftPaneOpacity = Math.max(0, 1 - smoothExpandRight * 1.25);
 
       if (isPortraitRef.current) {
         if (leftPaneRef.current) {
           leftPaneRef.current.style.width = '100%';
           leftPaneRef.current.style.height = `${dividerPct.toFixed(2)}%`;
-          leftPaneRef.current.style.opacity = dividerPct < 2 ? '0' : '1';
+          leftPaneRef.current.style.opacity = leftPaneOpacity.toFixed(3);
         }
         if (rightPaneRef.current) {
           rightPaneRef.current.style.width = '100%';
@@ -248,13 +277,13 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
           splitDividerLineRef.current.style.height = '2px';
           splitDividerLineRef.current.style.transform = 'translate3d(0, -50%, 0)';
           splitDividerLineRef.current.style.opacity =
-            progress < 0.06 || dividerPct <= 1.5 ? '0' : smoothIntro.toFixed(3);
+            progress < 0.06 || dividerPct <= 1.5 ? '0' : (smoothIntro * leftPaneOpacity).toFixed(3);
         }
       } else {
         if (leftPaneRef.current) {
           leftPaneRef.current.style.height = '100%';
           leftPaneRef.current.style.width = `${dividerPct.toFixed(2)}%`;
-          leftPaneRef.current.style.opacity = dividerPct < 2 ? '0' : '1';
+          leftPaneRef.current.style.opacity = leftPaneOpacity.toFixed(3);
         }
         if (rightPaneRef.current) {
           rightPaneRef.current.style.height = '100%';
@@ -267,7 +296,7 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
           splitDividerLineRef.current.style.height = '100%';
           splitDividerLineRef.current.style.transform = 'translate3d(-50%, 0, 0)';
           splitDividerLineRef.current.style.opacity =
-            progress < 0.06 || dividerPct <= 1.5 ? '0' : smoothIntro.toFixed(3);
+            progress < 0.06 || dividerPct <= 1.5 ? '0' : (smoothIntro * leftPaneOpacity).toFixed(3);
         }
       }
 
@@ -420,7 +449,8 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
 
       const greenActiveT = Math.max(0, Math.min(1, (progress - 0.60) / 0.06));
       if (rightGreenGlowRef.current) {
-        const glowFadeOut = progress > 0.88 ? Math.max(0, 1 - (progress - 0.88) / 0.08) : 1;
+        const glowFadeOut =
+          progress > 0.86 ? Math.max(0, 1 - Math.pow((progress - 0.86) / 0.1, 2)) : 1;
         rightGreenGlowRef.current.style.opacity = (greenActiveT * 0.55 * glowFadeOut).toFixed(3);
       }
 
@@ -445,7 +475,7 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
         tablePhoneHaloRef.current.setAttribute('opacity', (greenActiveT * 0.45).toFixed(3));
       }
       if (tablePhoneScreenRef.current) {
-        tablePhoneScreenRef.current.setAttribute('fill', greenActiveT > 0.2 ? '#064e3b' : '#0f172a');
+        tablePhoneScreenRef.current.setAttribute('fill', '#0b141a');
       }
       if (ayeshaTablePhoneGroupRef.current) {
         const px = 238 + smoothPickup * 45;
@@ -470,13 +500,174 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
           unlockedPhoneContainerRef.current.style.pointerEvents = 'none';
           unlockedPhoneContainerRef.current.style.transform = 'translate3d(0, 64px, 0)';
         } else {
-          unlockedPhoneContainerRef.current.style.opacity = smoothPickup.toFixed(3);
-          unlockedPhoneContainerRef.current.style.pointerEvents = 'auto';
-          const yOffset = (1 - smoothPickup) * 64;
+          // Lower phone gently at the end of Scene 4 (s4Progress > 0.88) as Scene 5 morning handover begins
+          const s4ExitT = Math.max(0, Math.min(1, (s4Progress - 0.88) / 0.12));
+          const phoneOpacity = smoothPickup * (1 - s4ExitT * 0.35);
+          unlockedPhoneContainerRef.current.style.opacity = phoneOpacity.toFixed(3);
+          unlockedPhoneContainerRef.current.style.pointerEvents = s4ExitT > 0.5 ? 'none' : 'auto';
+          const yOffset = (1 - smoothPickup) * 64 + s4ExitT * 36;
           unlockedPhoneContainerRef.current.style.transform = `translate3d(0, ${yOffset.toFixed(
             1
           )}px, 0)`;
         }
+      }
+
+      // -----------------------------------------------------------------------
+      // SCENE 4: 2-STEP FAST WHATSAPP RESCUE INSIDE 3D SMARTPHONE (s4Progress: 0.00 -> 1.00)
+      // Step 1: Tap 'Yes, I'm Home' + Auto-Attach Live Gulberg III GPS Pin in one reply
+      // Step 2: Rasai Verified 07:30 AM Priority Dispatch Confirmation
+      // -----------------------------------------------------------------------
+      const effectiveS4 = manualRescueTriggeredRef.current ? Math.max(s4Progress, 0.72) : s4Progress;
+
+      // Tactile button press (0.04 -> 0.16)
+      if (effectiveS4 >= 0.06 && effectiveS4 <= 0.35 && !hasPlayedS4TapChimeRef.current) {
+        hasPlayedS4TapChimeRef.current = true;
+        soundEngine.playSuccessChime();
+      } else if (effectiveS4 < 0.02) {
+        hasPlayedS4TapChimeRef.current = false;
+      }
+
+      if (yesHomeBtnRef.current) {
+        const pressPulse =
+          effectiveS4 >= 0.03 && effectiveS4 <= 0.18
+            ? Math.sin(((effectiveS4 - 0.03) / 0.15) * Math.PI)
+            : 0;
+        const btnScale = 1 - pressPulse * 0.055;
+        yesHomeBtnRef.current.style.transform = `scale(${btnScale.toFixed(3)})`;
+      }
+
+      // Step 1 Reply Transition (0.15 -> 0.38)
+      const step1ReplyT = Math.max(0, Math.min(1, (effectiveS4 - 0.15) / 0.20));
+      const smoothStep1 = step1ReplyT * step1ReplyT * (3 - 2 * step1ReplyT);
+
+      if (quickRepliesTrayRef.current) {
+        if (smoothStep1 >= 0.98) {
+          quickRepliesTrayRef.current.style.display = 'none';
+        } else {
+          quickRepliesTrayRef.current.style.display = 'block';
+          quickRepliesTrayRef.current.style.opacity = (1 - smoothStep1).toFixed(3);
+        }
+      }
+      if (tablePhoneQuickRepliesRef.current) {
+        if (smoothStep1 >= 0.98) {
+          tablePhoneQuickRepliesRef.current.style.display = 'none';
+        } else {
+          tablePhoneQuickRepliesRef.current.style.display = 'block';
+          tablePhoneQuickRepliesRef.current.style.opacity = (1 - smoothStep1).toFixed(3);
+        }
+      }
+
+      if (ayeshaReplyBubbleRef.current) {
+        if (smoothStep1 <= 0.01) {
+          ayeshaReplyBubbleRef.current.style.display = 'none';
+          ayeshaReplyBubbleRef.current.style.opacity = '0';
+        } else {
+          ayeshaReplyBubbleRef.current.style.display = 'block';
+          ayeshaReplyBubbleRef.current.style.opacity = smoothStep1.toFixed(3);
+          const replyY = (1 - smoothStep1) * 12;
+          ayeshaReplyBubbleRef.current.style.transform = `translate3d(0, ${replyY.toFixed(1)}px, 0)`;
+        }
+      }
+      if (tablePhoneReplyBubbleRef.current) {
+        if (smoothStep1 <= 0.01) {
+          tablePhoneReplyBubbleRef.current.style.display = 'none';
+          tablePhoneReplyBubbleRef.current.style.opacity = '0';
+        } else {
+          tablePhoneReplyBubbleRef.current.style.display = 'block';
+          tablePhoneReplyBubbleRef.current.style.opacity = smoothStep1.toFixed(3);
+        }
+      }
+
+      // Native SVG GPS Pin Drop & Accuracy Ring inside Ayesha's reply bubble
+      if (gpsPinSvgGroupRef.current && smoothStep1 > 0.01) {
+        const pinDropT = Math.max(0, Math.min(1, (effectiveS4 - 0.20) / 0.18));
+        const pinEase = 1 - Math.pow(1 - pinDropT, 3);
+        const pinY = (1 - pinEase) * -18;
+        gpsPinSvgGroupRef.current.setAttribute('transform', `translate(130, ${(38 + pinY).toFixed(1)})`);
+      }
+      if (gpsPulseRingRef.current && smoothStep1 > 0.01) {
+        const ringT = ((effectiveS4 * 6) % 1 + 1) % 1;
+        gpsPulseRingRef.current.setAttribute('r', (8 + ringT * 16).toFixed(1));
+        gpsPulseRingRef.current.setAttribute('opacity', ((1 - ringT) * 0.65).toFixed(2));
+      }
+
+      // Step 2: Rasai Verified Dispatch Confirmation (0.44 -> 0.68)
+      const step2ConfirmT = Math.max(0, Math.min(1, (effectiveS4 - 0.44) / 0.20));
+      const smoothStep2 = step2ConfirmT * step2ConfirmT * (3 - 2 * step2ConfirmT);
+
+      if (effectiveS4 >= 0.46 && effectiveS4 <= 0.78 && !hasPlayedS4ConfirmChimeRef.current) {
+        hasPlayedS4ConfirmChimeRef.current = true;
+        soundEngine.playWhatsAppChime();
+      } else if (effectiveS4 < 0.40) {
+        hasPlayedS4ConfirmChimeRef.current = false;
+      }
+
+      if (rasaiConfirmBubbleRef.current) {
+        if (smoothStep2 <= 0.01) {
+          rasaiConfirmBubbleRef.current.style.display = 'none';
+          rasaiConfirmBubbleRef.current.style.opacity = '0';
+        } else {
+          rasaiConfirmBubbleRef.current.style.display = 'block';
+          rasaiConfirmBubbleRef.current.style.opacity = smoothStep2.toFixed(3);
+          const confirmY = (1 - smoothStep2) * 12;
+          rasaiConfirmBubbleRef.current.style.transform = `translate3d(0, ${confirmY.toFixed(1)}px, 0)`;
+        }
+      }
+      if (tablePhoneConfirmBubbleRef.current) {
+        if (smoothStep2 <= 0.01) {
+          tablePhoneConfirmBubbleRef.current.style.display = 'none';
+          tablePhoneConfirmBubbleRef.current.style.opacity = '0';
+        } else {
+          tablePhoneConfirmBubbleRef.current.style.display = 'block';
+          tablePhoneConfirmBubbleRef.current.style.opacity = smoothStep2.toFixed(3);
+        }
+      }
+
+      // Scroll internal WhatsApp chat track upward inside fixed-height phone screen so phone size NEVER changes
+      if (chatMessagesTrackRef.current) {
+        const chatScrollY = smoothStep1 * 28 + smoothStep2 * 138;
+        chatMessagesTrackRef.current.style.transform = `translate3d(0, -${chatScrollY.toFixed(1)}px, 0)`;
+      }
+      if (tablePhoneChatTrackRef.current) {
+        const tableChatScrollY = smoothStep1 * 24 + smoothStep2 * 118;
+        tablePhoneChatTrackRef.current.setAttribute(
+          'transform',
+          `translate(0, -${tableChatScrollY.toFixed(1)})`
+        );
+      }
+
+      // Update status bar & WhatsApp header clock from 11:43 to 11:44 on reply (synchronized across both phones)
+      const clockLabel = smoothStep1 > 0.5 ? '11:44' : '11:43';
+      if (phoneClockTextRef.current && phoneClockTextRef.current.textContent !== clockLabel) {
+        phoneClockTextRef.current.textContent = clockLabel;
+      }
+      if (tablePhoneClockRef.current && tablePhoneClockRef.current.textContent !== clockLabel) {
+        tablePhoneClockRef.current.textContent = clockLabel;
+      }
+      const headerClockLabel = smoothStep1 > 0.5 ? '11:44 AM' : '11:43 AM';
+      if (waHeaderClockRef.current && waHeaderClockRef.current.textContent !== headerClockLabel) {
+        waHeaderClockRef.current.textContent = headerClockLabel;
+      }
+      if (
+        tablePhoneHeaderClockRef.current &&
+        tablePhoneHeaderClockRef.current.textContent !== headerClockLabel
+      ) {
+        tablePhoneHeaderClockRef.current.textContent = headerClockLabel;
+      }
+
+      // Scene 4 Minimal 2-Line Rounded Caption (s4Progress: 0.10 -> 0.90)
+      if (scene4CaptionRef.current) {
+        let s4CapOpacity = 0;
+        if (s4Progress >= 0.10 && s4Progress <= 0.92) {
+          const fadeIn = Math.min(1, (s4Progress - 0.10) / 0.12);
+          const fadeOut = Math.min(1, (0.92 - s4Progress) / 0.10);
+          s4CapOpacity = Math.min(fadeIn, fadeOut);
+        }
+        scene4CaptionRef.current.style.opacity = s4CapOpacity.toFixed(3);
+        scene4CaptionRef.current.style.transform = `translate3d(-50%, ${(
+          (1 - s4CapOpacity) *
+          12
+        ).toFixed(1)}px, 0)`;
       }
     }, [embedded]);
 
@@ -727,12 +918,26 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                   ------------------------------------------------------------- */}
               <div
                 ref={leftPaneRef}
-                className={`relative overflow-hidden bg-[#080d18] ${
+                className={`relative overflow-hidden bg-[#080d18] transform-gpu ${
                   isPortrait
                     ? 'w-full h-1/2 will-change-[height,opacity]'
                     : 'h-full w-1/2 will-change-[width,opacity]'
                 }`}
-                style={isPortrait ? { width: '100%', height: '50%' } : { width: '50%', height: '100%' }}
+                style={
+                  isPortrait
+                    ? {
+                        width: '100%',
+                        height: '50%',
+                        transform: 'translate3d(0, 0, 0)',
+                        backfaceVisibility: 'hidden',
+                      }
+                    : {
+                        width: '50%',
+                        height: '100%',
+                        transform: 'translate3d(0, 0, 0)',
+                        backfaceVisibility: 'hidden',
+                      }
+                }
               >
                 <svg
                   viewBox="0 0 960 1080"
@@ -1308,12 +1513,26 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                   ------------------------------------------------------------- */}
               <div
                 ref={rightPaneRef}
-                className={`relative overflow-hidden bg-[#1e1510] ${
+                className={`relative overflow-hidden bg-[#1e1510] transform-gpu ${
                   isPortrait
                     ? 'w-full h-1/2 will-change-[height]'
                     : 'h-full w-1/2 will-change-[width]'
                 }`}
-                style={isPortrait ? { width: '100%', height: '50%' } : { width: '50%', height: '100%' }}
+                style={
+                  isPortrait
+                    ? {
+                        width: '100%',
+                        height: '50%',
+                        transform: 'translate3d(0, 0, 0)',
+                        backfaceVisibility: 'hidden',
+                      }
+                    : {
+                        width: '50%',
+                        height: '100%',
+                        transform: 'translate3d(0, 0, 0)',
+                        backfaceVisibility: 'hidden',
+                      }
+                }
               >
                 <svg
                   viewBox="0 0 960 1080"
@@ -2229,6 +2448,12 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                     tablePhoneGroupRef={ayeshaTablePhoneGroupRef}
                     tablePhoneHaloRef={tablePhoneHaloRef}
                     tablePhoneScreenRef={tablePhoneScreenRef}
+                    tablePhoneClockRef={tablePhoneClockRef}
+                    tablePhoneHeaderClockRef={tablePhoneHeaderClockRef}
+                    tablePhoneChatTrackRef={tablePhoneChatTrackRef}
+                    tablePhoneQuickRepliesRef={tablePhoneQuickRepliesRef}
+                    tablePhoneReplyBubbleRef={tablePhoneReplyBubbleRef}
+                    tablePhoneConfirmBubbleRef={tablePhoneConfirmBubbleRef}
                   />
 
                   {/* Ayesha's Typewriter Speech Bubble (Optimized for Foldables, Tablets & Desktops) */}
@@ -2293,11 +2518,15 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                 {/* Calm Emerald-Green Ambient Glow when Rasai Reaches Ayesha */}
                 <div
                   ref={rightGreenGlowRef}
-                  className="absolute inset-0 z-10 pointer-events-none border-4 border-emerald-400/80"
+                  className="absolute inset-0 z-10 pointer-events-none border-4 border-emerald-400/80 transform-gpu"
                   style={{
                     opacity: 0,
+                    transform: 'translate3d(0, 0, 0)',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    willChange: 'opacity',
                     background:
-                      'radial-gradient(circle at center, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.42) 100%)',
+                      'radial-gradient(ellipse at 50% 50%, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.42) 100%)',
                   }}
                 />
 
@@ -2331,7 +2560,10 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
 
                       {/* Prominent Front Camera, Earpiece Speaker Mesh & Status Bar */}
                       <div className="bg-[#070a12] px-4 py-2 flex items-center justify-between border-b border-slate-800/90">
-                        <span className="font-mono text-[10px] font-bold text-slate-200 tracking-tight">
+                        <span
+                          ref={phoneClockTextRef}
+                          className="font-mono text-[10px] font-bold text-slate-200 tracking-tight"
+                        >
                           11:43
                         </span>
                         <div className="flex items-center justify-center gap-2">
@@ -2360,7 +2592,7 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                           </div>
                           <div>
                             <div className="text-xs font-bold text-white flex items-center gap-1">
-                              <span>Rasai Logistics</span>
+                              <span>Rasai</span>
                               <span className="text-[10px] bg-emerald-400 text-slate-950 rounded-full px-1 font-black">
                                 ✓
                               </span>
@@ -2370,48 +2602,170 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
                             </div>
                           </div>
                         </div>
-                        <span className="font-mono text-[10px] text-emerald-200">11:43 AM</span>
+                        <span ref={waHeaderClockRef} className="font-mono text-[10px] text-emerald-200">
+                          11:43 AM
+                        </span>
                       </div>
 
-                      {/* WhatsApp Chat Body */}
-                      <div className="p-4 bg-[#0b141a] space-y-3">
-                        <div className="text-center">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-800/95 border border-amber-400/30 text-[10px] font-mono text-amber-300 shadow-sm">
-                            GHOST SCAN INTERCEPTED • 2.8 KM AWAY
-                          </span>
+                      {/* WhatsApp Chat Body (Strictly Fixed Height — Phone Chassis Size Never Changes) */}
+                      <div className="bg-[#0b141a] h-[346px] sm:h-[358px] flex flex-col justify-between overflow-hidden">
+                        {/* Internal Clipped Chat Viewport */}
+                        <div className="flex-1 overflow-hidden px-3.5 sm:px-4 pt-3 relative">
+                          <div
+                            ref={chatMessagesTrackRef}
+                            className="space-y-2.5 will-change-transform"
+                            style={{ transform: 'translate3d(0, 0px, 0)' }}
+                          >
+                            <div className="text-center">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-800/95 border border-amber-400/30 text-[10px] font-mono text-amber-300 shadow-sm">
+                                GHOST SCAN INTERCEPTED • 2.8 KM AWAY
+                              </span>
+                            </div>
+
+                            {/* Incoming Rasai Message */}
+                            <div className="rounded-2xl rounded-tl-none bg-[#1f2c34] p-2.5 sm:p-3 text-xs text-slate-100 leading-relaxed border border-slate-700/70 shadow-md">
+                              <p className="font-semibold text-emerald-300 mb-0.5">
+                                Assalam-o-Alaikum Ayesha!
+                              </p>
+                              <p className="text-slate-200">
+                                Our courier marked <strong>&ldquo;Customer Unavailable&rdquo;</strong> for
+                                parcel <strong>#LP-9042 (COD Rs. 4,500)</strong>, but Rasai detected the
+                                rider was 2.8 km away.
+                              </p>
+                              <p className="mt-1 text-white font-medium">
+                                We blocked the return. Are you home right now?
+                              </p>
+                              <div className="text-[9px] text-slate-400 text-right mt-0.5">11:43 AM</div>
+                            </div>
+
+                            {/* Quick-Reply Interactive Buttons (Replaced in-place on Step 1 Reply) */}
+                            <div ref={quickRepliesTrayRef} className="space-y-1.5 pt-1">
+                              <button
+                                ref={yesHomeBtnRef}
+                                type="button"
+                                onClick={() => {
+                                  manualRescueTriggeredRef.current = true;
+                                  soundEngine.playSuccessChime();
+                                  applyScrollMutations(scrollProgressRef.current);
+                                }}
+                                className="w-full py-2 px-3 rounded-xl bg-gradient-to-b from-emerald-400 to-emerald-500 text-slate-950 font-sans text-xs font-black text-center shadow-[0_4px_20px_rgba(16,185,129,0.5)] border-t border-emerald-200 cursor-pointer select-none transition-transform"
+                              >
+                                ✓ Yes, I&apos;m Home (Rs. 4,500 Cash Ready)
+                              </button>
+                              <div className="w-full py-2 px-3 rounded-xl bg-[#1f2c34] text-emerald-300 border border-emerald-500/40 font-sans text-xs font-semibold text-center shadow-sm">
+                                📍 Share Exact Gulberg Doorstep Pin
+                              </div>
+                              <div className="w-full py-2 px-3 rounded-xl bg-[#1f2c34] text-slate-300 border border-slate-700 font-sans text-xs font-medium text-center shadow-sm">
+                                📅 Reschedule Time Slot
+                              </div>
+                            </div>
+
+                            {/* SCENE 4 STEP 1: Ayesha Combined Outgoing Reply + Auto-Attached Gulberg III Vector GPS Map */}
+                            <div
+                              ref={ayeshaReplyBubbleRef}
+                              className="ml-auto w-[92%] rounded-2xl rounded-tr-none bg-[#005c4b] p-2.5 text-xs text-white border border-emerald-500/40 shadow-lg space-y-2"
+                              style={{ display: 'none', opacity: 0, transform: 'translate3d(0, 12px, 0)' }}
+                            >
+                              <p className="font-semibold text-emerald-50 leading-snug">
+                                ✓ Yes, I&apos;m home! Rs. 4,500 cash is ready.
+                              </p>
+
+                              {/* Embedded Native Vector Gulberg III Rooftop GPS Map Card */}
+                              <div className="rounded-xl overflow-hidden border border-emerald-400/35 bg-[#071512]">
+                                <svg
+                                  viewBox="0 0 260 72"
+                                  className="w-full h-[64px] block pointer-events-none"
+                                  preserveAspectRatio="xMidYMid slice"
+                                >
+                                  <rect width="260" height="72" fill="#071915" />
+                                  {/* Gulberg III Street & Block H Vector Grid */}
+                                  <line x1="0" y1="22" x2="260" y2="22" stroke="#0f352c" strokeWidth="5" />
+                                  <line x1="0" y1="52" x2="260" y2="52" stroke="#0d2b24" strokeWidth="3.5" />
+                                  <line x1="68" y1="0" x2="52" y2="72" stroke="#0f352c" strokeWidth="4.5" />
+                                  <line x1="184" y1="0" x2="196" y2="72" stroke="#0d2b24" strokeWidth="3.5" />
+                                  {/* Flat 4B Block H Building Footprint */}
+                                  <rect
+                                    x="96"
+                                    y="26"
+                                    width="68"
+                                    height="22"
+                                    rx="3"
+                                    fill="#0f2f26"
+                                    stroke="#10b981"
+                                    strokeWidth="1"
+                                    strokeDasharray="3 2"
+                                  />
+                                  <text
+                                    x="20"
+                                    y="15"
+                                    fill="#6ee7b7"
+                                    fontSize="7.5"
+                                    fontFamily="monospace"
+                                    fontWeight="700"
+                                    opacity="0.8"
+                                  >
+                                    BLOCK H • GULBERG III
+                                  </text>
+                                  {/* Pulsing GPS Accuracy Ring */}
+                                  <circle
+                                    ref={gpsPulseRingRef}
+                                    cx="130"
+                                    cy="38"
+                                    r="12"
+                                    fill="none"
+                                    stroke="#34d399"
+                                    strokeWidth="1.5"
+                                    opacity="0.55"
+                                  />
+                                  {/* Pin Ground Shadow */}
+                                  <ellipse cx="130" cy="40" rx="5.5" ry="2.2" fill="#020617" opacity="0.65" />
+                                  {/* Dropping 3D Emerald GPS Pin */}
+                                  <g ref={gpsPinSvgGroupRef} transform="translate(130, 38)">
+                                    <path
+                                      d="M0,0 C-5,-7 -9,-11 -9,-16 C-9,-21 -5,-25 0,-25 C5,-25 9,-21 9,-16 C9,-11 5,-7 0,0 Z"
+                                      fill="#10b981"
+                                      stroke="#ecfdf5"
+                                      strokeWidth="1.2"
+                                    />
+                                    <circle cx="0" cy="-16" r="3.2" fill="#052e16" />
+                                  </g>
+                                </svg>
+                                <div className="px-2.5 py-1 bg-[#09221c] flex items-center justify-between text-[10px] font-mono text-emerald-200 border-t border-emerald-500/20">
+                                  <span className="font-bold text-white">📍 Flat 4B, Gulberg III</span>
+                                  <span>31.5204° N, 74.3587° E</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-1 text-[9px] text-emerald-200/90 font-mono">
+                                <span>Live Doorstep Pin Attached • 11:44 AM</span>
+                                <span className="text-sky-300 font-bold">✓✓</span>
+                              </div>
+                            </div>
+
+                            {/* SCENE 4 STEP 2: Rasai Verified Dispatch Confirmation Bubble */}
+                            <div
+                              ref={rasaiConfirmBubbleRef}
+                              className="rounded-2xl rounded-tl-none bg-[#1f2c34] p-2.5 text-xs text-slate-100 leading-snug border border-emerald-500/50 shadow-[0_6px_24px_rgba(16,185,129,0.18)]"
+                              style={{ display: 'none', opacity: 0, transform: 'translate3d(0, 12px, 0)' }}
+                            >
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-[9.5px] font-mono font-bold text-emerald-300 mb-1">
+                                <span>✓ 07:30 AM PRIORITY RUN-SHEET LOCKED</span>
+                              </div>
+                              <p className="text-slate-100">
+                                Shukriya Ayesha! Your exact Gulberg III pin is locked for{' '}
+                                <strong className="text-white">#LP-9042 (Rs. 4,500 COD)</strong>.
+                                Guaranteed delivery tomorrow at{' '}
+                                <strong className="text-emerald-300">10:00 AM</strong>.
+                              </p>
+                              <div className="text-[9px] text-slate-400 text-right mt-0.5 font-mono">
+                                11:44 AM
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Incoming Rasai Message */}
-                        <div className="rounded-2xl rounded-tl-none bg-[#1f2c34] p-3 text-xs text-slate-100 leading-relaxed border border-slate-700/70 shadow-md">
-                          <p className="font-semibold text-emerald-300 mb-1">
-                            Assalam-o-Alaikum Ayesha!
-                          </p>
-                          <p className="text-slate-200">
-                            Our courier marked <strong>&ldquo;Customer Unavailable&rdquo;</strong> for
-                            parcel <strong>#LP-9042 (COD Rs. 4,500)</strong>, but Rasai detected the
-                            rider was 2.8 km away.
-                          </p>
-                          <p className="mt-1.5 text-white font-medium">
-                            We blocked the return. Are you home right now?
-                          </p>
-                          <div className="text-[9px] text-slate-400 text-right mt-1">11:43 AM</div>
-                        </div>
-
-                        {/* Quick-Reply Interactive Buttons */}
-                        <div className="space-y-1.5 pt-1">
-                          <div className="w-full py-2 px-3 rounded-xl bg-gradient-to-b from-emerald-400 to-emerald-500 text-slate-950 font-sans text-xs font-black text-center shadow-[0_4px_20px_rgba(16,185,129,0.5)] border-t border-emerald-200">
-                            ✓ Yes, I&apos;m Home (Rs. 4,500 Cash Ready)
-                          </div>
-                          <div className="w-full py-2 px-3 rounded-xl bg-[#1f2c34] text-emerald-300 border border-emerald-500/40 font-sans text-xs font-semibold text-center shadow-sm">
-                            📍 Share Exact Gulberg Doorstep Pin
-                          </div>
-                          <div className="w-full py-2 px-3 rounded-xl bg-[#1f2c34] text-slate-300 border border-slate-700 font-sans text-xs font-medium text-center shadow-sm">
-                            📅 Reschedule Time Slot
-                          </div>
-                        </div>
-
-                        {/* Bottom Home Bar Indicator */}
-                        <div className="pt-1 flex justify-center">
+                        {/* Bottom Home Bar Indicator (Pinned to Bottom of Fixed-Size Phone Screen) */}
+                        <div className="py-2 bg-[#0b141a] flex justify-center shrink-0 border-t border-slate-800/40">
                           <div className="w-24 h-1 rounded-full bg-slate-600/80" />
                         </div>
                       </div>
@@ -2437,18 +2791,31 @@ export const Scene3Doorstep = React.forwardRef<Scene3Handle, Scene3DoorstepProps
             </div>
 
             {/* ===============================================================
-                MINIMAL CAPTION RECTANGLE WITH SOFT ROUNDED BORDERS (2 Lines)
+                MINIMAL CAPTION RECTANGLE WITH SOFT ROUNDED BORDERS
                 =============================================================== */}
             <div
               ref={minimalCaptionRef}
-              className="absolute bottom-2 sm:bottom-5 left-1/2 z-35 w-[92%] sm:w-auto min-w-[320px] sm:min-w-[520px] max-w-xl rounded-2xl bg-[#090d16]/95 border-[1.5px] border-slate-700/90 px-4 sm:px-6 py-2 sm:py-3 text-center shadow-2xl pointer-events-none backdrop-blur-md"
+              className="absolute bottom-2 sm:bottom-5 left-1/2 z-35 w-[92%] sm:w-auto min-w-[300px] sm:min-w-[440px] max-w-xl rounded-2xl bg-[#090d16]/95 border-[1.5px] border-slate-700/90 px-4 sm:px-6 py-2 sm:py-2.5 text-center shadow-2xl pointer-events-none backdrop-blur-md"
+              style={{ opacity: 0, transform: 'translate3d(-50%, 12px, 0)' }}
+            >
+              <p className="font-sans text-[11px] sm:text-xs md:text-[13px] font-bold text-emerald-400 tracking-wide leading-snug m-0">
+                Rasai blocks the false return and notifies Ayesha directly.
+              </p>
+            </div>
+
+            {/* ===============================================================
+                SCENE 4 MINIMAL CAPTION RECTANGLE (2-Step Fast WhatsApp Rescue)
+                =============================================================== */}
+            <div
+              ref={scene4CaptionRef}
+              className="absolute bottom-2 sm:bottom-5 left-1/2 z-35 w-[92%] sm:w-auto min-w-[320px] sm:min-w-[520px] max-w-xl rounded-2xl bg-[#090d16]/95 border-[1.5px] border-emerald-500/40 px-4 sm:px-6 py-2 sm:py-3 text-center shadow-2xl pointer-events-none backdrop-blur-md"
               style={{ opacity: 0, transform: 'translate3d(-50%, 12px, 0)' }}
             >
               <p className="font-sans text-[10.5px] sm:text-xs md:text-[13px] font-medium text-slate-100 tracking-wide leading-snug m-0">
-                <span className="text-red-400 font-bold">2.8 km away</span>, Kamran swipes &lsquo;Customer Unavailable&rsquo; &mdash;
+                <span className="text-emerald-300 font-bold">One tap</span> confirms Rs. 4,500 cash and drops Ayesha&rsquo;s live Gulberg III pin &mdash;
               </p>
               <p className="font-sans text-[10.5px] sm:text-xs md:text-[13px] font-bold text-emerald-400 tracking-wide leading-snug m-0 mt-0.5">
-                Rasai blocks the false return and notifies Ayesha directly.
+                Rasai locks #LP-9042 onto tomorrow&rsquo;s 07:30 AM priority run-sheet.
               </p>
             </div>
 
